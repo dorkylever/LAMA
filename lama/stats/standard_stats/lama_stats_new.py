@@ -187,16 +187,14 @@ def run(config_path: Path,
  
                 logging.info(f"Finished processing line: {line_id} - All done")                  
                 common.logMemoryUsageInfo()
-                               
+                
             except StopIteration:
                 if (line_input_data != None):
                     logging.info(f"Finish iterate through lines")
                     line_input_data.cleanup()
                     common.logMemoryUsageInfo()
-                break            
+                break
          
-
-
 
 def invert_heatmaps(heatmap: Path,
                     stats_outdir: Path,
