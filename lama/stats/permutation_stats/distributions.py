@@ -155,6 +155,7 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
     logger.info('generating permutations')
     data = data.drop(columns='staging', errors='ignore')
     line_specimen_counts = get_line_specimen_counts(data, two_way=True)
+    print("line specimen counts", line_specimen_counts)
     n_groups = get_two_way_n_groups(data)
 
     result = {}
@@ -167,6 +168,7 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
         ratios = counts[counts.index != 0] / number_of_lines
         num_combs = num_perms * ratios
 
+        print(num_combs)
         # get wt data for label
         label_data = data[[label, 'line']]
         label_data = label_data[label_data.line == 'baseline']
@@ -180,6 +182,7 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
         for n, n_combs_to_try in num_combs.items():
             n_combs_to_try = math.ceil(n_combs_to_try)
             max_combs = two_way_max_combinations(n, n_groups)
+            print("n", n, "n_groups", n_groups, "max_combs", max_combs)
             # logger.info(f'max_combinations for n={n} and wt_n={len(label_data)} = {max_combs}')
             records.append([n, n_combs_to_try, max_combs])
         df = pd.DataFrame.from_records(records, columns=['n', 'num_combs', 'max_combs'], index='n').sort_index(

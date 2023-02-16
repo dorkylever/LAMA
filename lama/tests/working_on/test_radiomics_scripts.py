@@ -18,8 +18,7 @@ import pacmap
 from lama.scripts import lama_permutation_stats
 
 stats_cfg = Path(
-    "C:/LAMA/lama/tests/configs/permutation_stats/perm_no_qc.yaml")
-
+    "C:/Users/Kyle/PycharmProjects/LAMA/lama/tests/configs/permutation_stats/perm_no_qc.yaml")
 from lama.stats.permutation_stats.run_permutation_stats import get_radiomics_data
 
 
@@ -706,15 +705,15 @@ def test_radiomic_org_plotting():
 
 
 def test_get_rad_data_for_perm():
-    _dir = Path("E:/221122_two_way/g_by_back_data/radiomics_output")
+    _dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/radiomics_output")
 
-    wt_dir = Path("E:/221122_two_way/g_by_back_data/baseline")
+    wt_dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/baseline")
 
-    mut_dir = Path("E:/221122_two_way/g_by_back_data/mutants")
+    mut_dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/mutants")
 
-    treat_dir = Path("E:/221122_two_way/g_by_back_data/treatment")
+    treat_dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/treatment")
 
-    inter_dir = Path("E:/221122_two_way/g_by_back_data/mut_treat")
+    inter_dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/mut_treat")
 
     results = get_radiomics_data(_dir, wt_dir, mut_dir, treat_dir, inter_dir)
 
