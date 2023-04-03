@@ -105,7 +105,7 @@ def make_ml_jobs_file(jobs_file: Path, file_paths: list):
 
 
 
-def ml_job_runner(org_dir, n_sample: bool=True):
+def ml_job_runner(org_dir, n_sample: bool=True, non_tum_path: str=None):
 
     '''i
     Performs the pyradiomic calculations
@@ -115,6 +115,7 @@ def ml_job_runner(org_dir, n_sample: bool=True):
     ----------
     target_dir
 
+    non_tum_path = path for non tumour dataset to normalise features.
 
 
     Returns
@@ -172,9 +173,6 @@ def ml_job_runner(org_dir, n_sample: bool=True):
 
                 org_csv_path = Path(org_dir) / (jobs_to_do.at[indx, 'job'])
 
-
-
-
                 df_jobs.at[indx, 'status'] = 'running'
                 df_jobs.at[indx, 'start_time'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
                 df_jobs.at[indx, 'host'] = socket.gethostname()
@@ -189,13 +187,13 @@ def ml_job_runner(org_dir, n_sample: bool=True):
         org_df = pd.read_csv(org_csv_path)
         try:
             org = org_df['org'][0]
-            feature_reduction.main(org_df, org, org_dir)
+            feature_reduction.main(org_df, org, org_dir, n_sampler=False)
         except KeyError:
             # BQ data should have no 'org' info
             features = org_df
             features = features[features.columns.drop(list(features.filter(regex="diagnostics")))]
             features.drop(["scanID"], axis=1, inplace=True)
-            feature_reduction.main(features, org=None, rad_file_path=Path(org_dir.parent / "full_results.csv"), n_sampler=True)
+            feature_reduction.main(features, org=None, rad_file_path=Path(org_dir.parent / "full_results.csv"), n_sampler=False, non_tum_path=non_tum_path)
 
         # perform feature reduction on a single organ
 

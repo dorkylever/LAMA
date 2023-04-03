@@ -351,25 +351,51 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
 
             os.makedirs(rad_dir, exist_ok=True)
             logging.info("Extracting Rigids")
-            rigids = extract_registrations(target_dir, outdir_name=scan_dir)
+            rigids, rigid_paths = extract_registrations(target_dir, outdir_name=scan_dir)
             logging.info("Extracting Inverted Labels")
-            labels = extract_registrations(target_dir, labs_of_int, outdir_name=tumour_dir)
+            labels, label_paths = extract_registrations(target_dir, labs_of_int, outdir_name=tumour_dir)
 
             if norm_label:
                 logging.info("Extracting Stage labels")
-                stage_labels = extract_registrations(target_dir, labs_of_int, outdir_name=stage_dir, norm_label=True)
-                logging.info("Correcting Metadata")
+                stage_labels, stage_paths = extract_registrations(target_dir, labs_of_int, outdir_name=stage_dir, norm_label=True)
+            else:
+                logging.info("Extracting Inverted Stats Masks")
+                inv_stats_masks, inv_mask_paths = extract_registrations(target_dir, labs_of_int, stats_mask=True)
+
+            logging.info("checking for mismatching")
+            rigid_basenames = {os.path.basename(path) for path in rigid_paths}
+            label_basenames = {os.path.basename(path) for path in label_paths}
+            mask_basenames = {os.path.basename(path) for path in stage_paths} if norm_label else {os.path.basename(path)
+                                                                                                  for path in
+                                                                                                  inv_mask_paths}
+            try:
+                assert all(basename_set == rigid_basenames for basename_set in
+                       [label_basenames, mask_basenames]), "Basenames are not identical"
+                logging.info("Order is correct")
+
+            except AssertionError as e:
+                logging.info("Order is not correct, correcting")
+                rigid_dict = {os.path.basename(path): rigid for path, rigid in zip(rigid_paths, rigids)}
+                label_dict = {os.path.basename(path): label for path, label in zip(label_paths, labels)}
+                mask_dict = {os.path.basename(path): mask for path, mask in
+                             zip(stage_paths if norm_label else inv_mask_paths,
+                                 stage_labels if norm_label else inv_stats_masks)}
+
+                # reset lists and order via dict
+                rigids = [rigid_dict[basename] for basename in rigid_basenames]
+                labels = [label_dict[basename] for basename in rigid_basenames]
+                if norm_label:
+                    stage_labels = [mask_dict[basename] for basename in rigid_basenames]
+                else:
+                    inv_stats_masks = [mask_dict[basename] for basename in rigid_basenames]
 
             if scan_dir and norm_label:
+                logging.info("Correcting Metadata")
                 #so if the user is providing different directories - it's likely BQ lab and th
                 for i, lab in enumerate(stage_labels):
                     lab.CopyInformation(rigids[i])
                     labels[i].CopyInformation(rigids[i])
 
-
-            else:
-                logging.info("Extracting Inverted Stats Masks")
-                inv_stats_masks = extract_registrations(target_dir, labs_of_int, stats_mask=True)
 
         else: # good for debugging if normalisation stuffs up
             logging.info("loading rigids")
@@ -426,7 +452,8 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
 
 
         logging.info("Writing Normalised Rigids")
-        rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
+        if 'rigid_paths' not in locals():
+            rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
         # sort should be identical:
         #rigid_paths.sort(key=lambda x: os.path.basename(x))
 

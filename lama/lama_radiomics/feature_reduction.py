@@ -29,6 +29,34 @@ from sklearn.model_selection import KFold
 
 
 
+def non_tum_normalise(tum_dataset: pd.DataFrame, non_tum_dataset: pd.DataFrame):
+    #do an assertion between tumour and non_tumour sizes and IDs
+
+    assert tum_dataset.index.equals(non_tum_dataset.index) and tum_dataset.columns.equals(non_tum_dataset.columns)
+
+    # separate datasets into numeric and non-numeric data
+    tum_num_met = tum_dataset.loc[:, ['Date', 'Animal_No.']]
+    tum_numeric = tum_dataset.select_dtypes(include=[np.number]).drop(['Date', 'Animal_No.'], axis=1)
+    tum_non_numeric = tum_dataset.select_dtypes(exclude=[np.number])
+    non_tum_numeric = non_tum_dataset.select_dtypes(include=[np.number]).drop(['Date', 'Animal_No.'], axis=1)
+    non_tum_non_numeric = non_tum_dataset.select_dtypes(exclude=[np.number])
+
+    # divide numeric values from tum_dataset by non_tum_dataset - store the result
+    result_numeric = tum_numeric / non_tum_numeric
+
+    # combine the non-numeric dataset from tum_dataset and the result
+    result = pd.concat([tum_non_numeric, result_numeric, tum_num_met], axis=1)
+
+    result = result[tum_dataset.columns]
+    result = result.loc[tum_dataset.index]
+    # ensure that row and col order is maintained
+    assert result.index.equals(tum_dataset.index) and result.columns.equals(tum_dataset.columns)
+
+    print(result)
+
+    return result
+
+
 def correlation(dataset: pd.DataFrame, _dir: Path = None, threshold: float = 0.9, org=None):
     """
     identifies correlated features in  a
@@ -165,9 +193,8 @@ def smote_oversampling(X, k: int = 6, max_non_targets: int = 300):
 
 
 
-def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.DataFrame = None, test_size: float = 0.2):
+def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.DataFrame = None, test_size: float = 0.2, non_tum_path: str = None):
     logging.info("Doing org: {}".format(org))
-
 
     logging.info("Starting")
 
@@ -192,13 +219,27 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         X.set_index('Exp', inplace=True)
         X.drop(['Date', 'Animal_No.'], axis=1, inplace=True)
 
+    elif non_tum_path:
+        logging.info("Normalising between tumour and non-tumour sites")
+        non_tum = pd.read_csv(non_tum_path, index_col=0)
+        X = non_tum_normalise(X, non_tum)
+        X['Tumour_Model'] = X['Tumour_Model'].map({'4T1R': 0, 'CT26R': 1}).astype(int)
+        X.set_index('Tumour_Model', inplace=True)
+        X.drop(['Date', 'Animal_No.'], axis=1, inplace=True)
+        #so there's data with NaN values = drop
+        X.dropna(axis=1,inplace=True)
+
+
+
     else:
         logging.info("Tumour Time!")
         X['Tumour_Model'] = X['Tumour_Model'].map({'4T1R': 0, 'CT26R': 1}).astype(int)
         X.set_index('Tumour_Model', inplace=True)
         X.drop(['Date', 'Animal_No.'], axis=1, inplace=True)
 
+
     X = X.select_dtypes(include=np.number)
+
 
     #do the same stuff for the complete dataset
 
@@ -244,7 +285,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         full_X = [X for X in full_X if X is not None]
         full_X = [X for X in full_X if (X.shape[1] > 0 & X.shape[1] < 200)]
     else:
-        n_feats = list(np.arange(1, 29, 1))
+        n_feats = list(np.arange(1, 31, 1))
         full_X = [shap_feat_select(X, shap_importance,rad_file_path.parent, n_feats=n, n_feat_cutoff=n, org=org) for n in n_feats]
 
 
@@ -387,7 +428,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
 
 
-def main(X, org, rad_file_path, batch_test=None, n_sampler: bool= False):
+def main(X, org, rad_file_path, batch_test=None, n_sampler: bool= False, non_tum_path: str=None):
     if n_sampler:
         n_fractions = list(np.arange(0.2, 1.2, 0.2))
 
@@ -400,19 +441,17 @@ def main(X, org, rad_file_path, batch_test=None, n_sampler: bool= False):
         #
         # sample_sizes = [np.round(X.groupby('Tumour_Model').count().to_numpy().min() * n, 0) for n in n_fractions]
 
+
         for i, n in enumerate(n_fractions):
             n_dir = rad_file_path.parent / ("test_size_" + str(n))
             os.makedirs(n_dir, exist_ok=True)
-
-
             #we just need to offer a fake file path so all files are created under n_dir
             n_path = n_dir / "fake_file.csv"
-
             #X_sub = X.groupby('Tumour_Model').apply(lambda x: x.sample(int(n)))
             #X_sub.to_csv(str(n_dir/ "sampled_dataset.csv"))
             #TODO see if this needs parallelising
-            run_feat_red(X, org=None, rad_file_path=n_path, batch_test=batch_test, test_size = n)
+            run_feat_red(X, org=None, rad_file_path=n_path, batch_test=batch_test, test_size=n, non_tum_path=non_tum_path)
 
     else:
-        run_feat_red(X, org=org, rad_file_path=rad_file_path, batch_test=batch_test)
+        run_feat_red(X, org=org, rad_file_path=rad_file_path, batch_test=batch_test, non_tum_path=non_tum_path)
 

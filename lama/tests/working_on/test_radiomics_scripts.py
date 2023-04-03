@@ -74,8 +74,8 @@ def test_radiomics():
 
             norm_meths = None
         logging.info("Starting Radiomics")
-        radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.IntensityHistogramMatch(), norm_label=norm_label,
-                             spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=True, scan_dir='imgs', tumour_dir='sphere_15', stage_dir='stage_labels')
+        radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.NonRegMaskNormalise(), norm_label=norm_label,
+                             spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=True, scan_dir='imgs', tumour_dir='full_contours', stage_dir='stage_labels')
 
 
 def test_permutation_stats_just_ovs():
@@ -479,7 +479,7 @@ def test_BQ_concat():
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
 def test_BQ_mach_learn():
-    _dir = Path("C:/test/features/")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/features")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -560,7 +560,7 @@ def test_BQ_mach_learn_non_tum():
 
 
 def test_BQ_mach_learn_batch_sp():
-    _dir = Path("E:/220913_BQ_tsphere/inputs/features/")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/features")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -643,17 +643,28 @@ def test_BQ_concat_batch():
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"), batch_test=True)
 
 
+def test_non_tum_feat_norm():
+    from lama.lama_radiomics.feature_reduction import non_tum_normalise
+    tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/results_for_ml/full_results.csv", index_col=0)
+    non_tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv", index_col=0)
+    results = non_tum_normalise(tum, non_tum)
+    results.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/normed_results.csv")
 
 
 
 
-@pytest.mark.skip
 def test_feat_reduction():
+    #features = pd.read_csv(, index_col=0)
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/230129_bq_tester/norm_methods/", n_sample=True)
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/")
 
+
+def test_mach_learn_pipeline_w_non_tum_norm():
+    non_tum_path = "E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv"
+
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/results_for_ml/", non_tum_path = non_tum_path)
 
 @pytest.mark.skip
 def test_radiomic_org_plotting():
