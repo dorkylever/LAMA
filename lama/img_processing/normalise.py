@@ -18,7 +18,6 @@ from scipy import ndimage
 
 try:
     from skimage.draw import line_aa
-
     skimage_available = True
 except ImportError:
     skimage_available = False
@@ -33,7 +32,6 @@ class Normaliser:
     def factory(type_, data_type: str):
 
         if data_type == 'intensity':
-
             # If passing an ROI as as list
             if isinstance(type_, (list,)):  # Not working at the moment
                 if len(type_) != 3:
@@ -44,7 +42,8 @@ class Normaliser:
                 return IntensityMaskNormalise()
             elif type_ == 'histogram':
                 return IntensityHistogramMatch()
-
+            elif type_ == 'N4biascorrection':
+                return IntensityN4Normalise()
         else:
             return None
 
@@ -104,7 +103,61 @@ class NonRegMaskNormalise(Normaliser):
         super().__init__(*args, *kwargs)
         self.reference_mean = None
 
-    def add_reference(self, ref: np.ndarray, ref_mask: np.ndarray):
+    def get_all_wt_vols_and_masks(self, _dir):
+        baseline_dir = Path(_dir).parent / "baseline"
+        vol_paths = [path for path in common.get_file_paths(baseline_dir) if "rigid" in str(path)]
+        mask_paths = [path for path in common.get_file_paths(baseline_dir) if "inverted_stats_mask" in str(path)]
+
+        vol_paths.sort(key=lambda x: os.path.basename(x))
+        mask_paths.sort(key=lambda x: os.path.basename(x))
+
+        vols = [common.LoadImage(_path).img for _path in vol_paths]
+        masks = [common.LoadImage(_path).img for _path in mask_paths]
+
+        return vols, masks
+
+
+
+    def gen_otsu_masks(self, volumes: List[np.ndarray], file_names: List[Path]=None):
+        '''
+        Creates an otsu for each scan
+        Parameters
+        ----------
+        volumes - list of volumes
+
+        Returns
+        -------
+
+        '''
+        logging.info("Creating_otsu_masks")
+        o_masks = [None]* len(volumes)
+        if ~isinstance(volumes, list):
+            # stops code from breaking in radiomics runner
+            volumes = [volumes]
+        for i, vol in enumerate(volumes):
+
+            Otsu = sitk.OtsuThresholdImageFilter()
+
+            inv_mask = Otsu.Execute(vol)
+            o_mask = sitk.InvertIntensity(inv_mask, 1)
+
+            o_mask = sitk.ConnectedComponent(o_mask != o_mask[0, 0, 0])
+
+            # sitk.WriteImage(seg, os.path.join(output, name + "_all_connected.nrrd"))
+            o_mask = sitk.RelabelComponent(o_mask)
+            o_mask = o_mask == 1
+            # sitk.WriteImage(seg, os.path.join(output, name + "_largest_connected.nrrd"))
+
+            # lets see if dilate with a tight kernal fixes getting stupid dots everywhere.
+            dilate = sitk.BinaryDilateImageFilter()
+            dilate.SetKernelRadius([1, 1, 1])
+            dilate.SetKernelType(sitk.sitkBall)
+            o_masks[i] = dilate.Execute(o_mask)
+            o_masks[i].CopyInformation(vol)
+
+        return o_masks
+
+    def add_reference(self, ref: sitk.SimpleITK.Image, ref_mask: sitk.SimpleITK.Image):
         """
         Add the
 
@@ -118,24 +171,35 @@ class NonRegMaskNormalise(Normaliser):
 
         # so when we add the reference, we're not storing the image
         # so we can slice it to make computation time quicker
-        img = sitk.GetArrayFromImage(ref)
-        mask = sitk.GetArrayFromImage(ref_mask)
+        means = []
+        def do_norm(vol, ref_mask):
+            img = sitk.GetArrayFromImage(vol)
+            mask = sitk.GetArrayFromImage(ref_mask)
 
-        s = ndimage.find_objects(mask)[0]
+            s = ndimage.find_objects(mask)[0]
 
-        mask = mask[s[0].start:s[0].stop,
-               s[1].start:s[1].stop,
-               s[2].start:s[2].stop]
-        img = img[s[0].start:s[0].stop,
-              s[1].start:s[1].stop,
-              s[2].start:s[2].stop]
+            mask = mask[s[0].start:s[0].stop,
+                   s[1].start:s[1].stop,
+                   s[2].start:s[2].stop]
+            img = img[s[0].start:s[0].stop,
+                  s[1].start:s[1].stop,
+                  s[2].start:s[2].stop]
 
-        # test if this improves speed
+            # test if this improves speed
 
-        # ignore vals outside of mask
-        img[mask != 1] = 0
+            # ignore vals outside of mask
+            img = img[mask == 1]
 
-        self.reference_mean = np.mean(img)
+            means.append(np.mean(img))
+
+        if isinstance(ref, list):
+            for i, vol in enumerate(ref):
+                do_norm(vol, ref_mask[i])
+
+        else:
+            do_norm(ref, ref_mask)
+
+        self.reference_mean = np.mean(means)
 
     def normalise(self, volumes: List[np.ndarray], masks: List[np.ndarray],
                   fold: bool = False, temp_dir: Path = None):
@@ -160,16 +224,19 @@ class NonRegMaskNormalise(Normaliser):
         logging.info('Normalising images to mask')
 
         for i, vol in enumerate(volumes):
-            logging.info(i)
-
-            img_a = sitk.GetArrayFromImage(vol)
-            mask_a = sitk.GetArrayFromImage(masks[i])
-
+            if isinstance(vol, sitk.SimpleITK.Image):
+                img_a = sitk.GetArrayFromImage(vol)
+            else:
+                img_a = sitk.GetArrayFromImage(vol.img)
+            if isinstance(masks[i], sitk.SimpleITK.Image):
+                mask_a = sitk.GetArrayFromImage(masks[i])
+            else:
+                mask_a = sitk.GetArrayFromImage(masks[i].img)
             t = tempfile.TemporaryFile(dir=temp_dir)
+            img_a = img_a[mask_a == 1]
             arr_for_mean = np.memmap(t, dtype=img_a.dtype, mode='w+', shape=img_a.shape)
-
             arr_for_mean[:] = img_a
-            arr_for_mean[mask_a != 1] = 0
+
             try:
                 # get all values inside mask to calculate mean
                 # self.reference_mean = np.mean(img) why is this here anyway
@@ -186,7 +253,7 @@ class NonRegMaskNormalise(Normaliser):
                 else:
                     mean_difference = np.mean(arr_for_mean) - self.reference_mean
                     subtract = sitk.SubtractImageFilter()
-                    volumes[i] = subtract.Execute(vol, mean_difference)
+                    volumes[i] = subtract.Execute(vol, float(mean_difference))
 
             except TypeError:  # Could be caused by imgarr being a short
                 # fold difference should not be here
@@ -208,7 +275,13 @@ class IntensityHistogramMatch(Normaliser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
 
-    def normalise(self, volumes: List[np.ndarray], ref_vol: np.ndarray):
+        #try:
+        #    ref_vol_path = Path(config.config_dir / config['reference_vol'])
+        #    self.ref_vol = common.LoadImage(ref_vol_path)
+        #except KeyError:
+        #    self.ref_vol = None
+
+    def normalise(self, volumes: List[np.ndarray], ref_vol: np.ndarray = None):
         """
         Normalises via bin matching to a reference image.
         ThresholdAtMeanIntensityOn() makes
@@ -223,72 +296,81 @@ class IntensityHistogramMatch(Normaliser):
         """
 
         logging.info('Using Histogram Matching')
-        # logging.info(np.max(ref_vol))
 
-        # ref = sitk.GetImageFromArray(ref_vol)
+        # Get the Population average as the ref vol if not provided.
+        #ref_vol = self.ref_vol if self.ref_vol else ref_vol
 
         # Only need to load the ref volume once
-
         matcher = sitk.HistogramMatchingImageFilter()
-        matcher.SetThresholdAtMeanIntensity(True)
-        #matcher.SetNumberOfHistogramLevels(256)
-        #matcher.SetNumberOfMatchPoints(7)
-        # matcher.SetReferenceImage(ref_vol)
+        matcher.SetNumberOfHistogramLevels(65536)
+        matcher.SetNumberOfMatchPoints(20000)
+        #matcher.SetThresholdAtMeanIntensity(True)
 
         for i, img in enumerate(volumes):
-            # img = sitk.GetImageFromArray(vol)
-            # matcher.SetSourceImage(img)
-            volumes[i] = matcher.Execute(img, ref_vol)
+            try:
+                volumes[i] = matcher.Execute(img, ref_vol)
+            except RuntimeError:  # needs casting
+                img = sitk.Cast(img, sitk.sitkFloat32)
+                ref_vol = sitk.Cast(ref_vol, sitk.sitkFloat32)
+                volumes[i] = matcher.Execute(img, ref_vol)
 
 
-class NonRegZNormalise(Normaliser):
+class IntensityN4Normalise(Normaliser):
     """
-    Normalise a set of volumes to the mean of voxel included in a mask.
-    In this case each volume needs its mask
-    as its not deformed.
+    Use N4 normalisation to normalise images - needs to have a mask specified or else all values > 1
+    are masked.
 
     """
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
-        self.reference_mean = None
-        self.reference_std = None
 
-    def add_reference(self, ref: np.ndarray, mask: np.ndarray):
-        """
-        Add the
-
+        #try:
+        #    ref_vol_path = Path(config.config_dir / config['reference_vol'])
+        #    self.ref_vol = common.LoadImage(ref_vol_path)
+        #except KeyError:
+        #    self.ref_vol = None
+    def gen_otsu_masks(self, vol: List[np.ndarray], file_names: List[Path]=None):
+        '''
+        Creates an otsu for each scan
         Parameters
         ----------
+        volumes - list of volumes
 
         Returns
         -------
+
+        '''
+        logging.info("Creating_otsu_masks")
+
+        Otsu = sitk.OtsuThresholdImageFilter()
+
+        inv_mask = Otsu.Execute(vol)
+        o_mask = sitk.InvertIntensity(inv_mask, 1)
+
+        o_mask = sitk.ConnectedComponent(o_mask != o_mask[0, 0, 0])
+
+        # sitk.WriteImage(seg, os.path.join(output, name + "_all_connected.nrrd"))
+        o_mask = sitk.RelabelComponent(o_mask)
+        o_mask = o_mask == 1
+        # sitk.WriteImage(seg, os.path.join(output, name + "_largest_connected.nrrd"))
+
+        # lets see if dilate with a tight kernal fixes getting stupid dots everywhere.
+        dilate = sitk.BinaryDilateImageFilter()
+        dilate.SetKernelRadius([1, 1, 1])
+        dilate.SetKernelType(sitk.sitkBall)
+        o_mask = dilate.Execute(o_mask)
+        o_mask.CopyInformation(vol)
+
+            #o_dir = file_names[0].parent.parent / "otsu_thresholds"
+            #os.makedirs(o_dir, exist_ok=True)
+            #sitk.WriteImage(o_mask, str(Path(o_dir) / os.path.basename(file_names[i])))
+        return o_mask
+
+    def normalise(self, img: List[np.ndarray], mask=List[np.ndarray]):
         """
-        logging.info('normalising intensity data to mean of the mask')
-
-        # so when we add the reference, we're not storing the image
-        # so we can slice it to make computation time quicker
-        s = ndimage.find_objects(mask)[0]
-
-        mask = mask[s[0].start:s[0].stop,
-               s[1].start:s[1].stop,
-               s[2].start:s[2].stop]
-        img = ref[s[0].start:s[0].stop,
-              s[1].start:s[1].stop,
-              s[2].start:s[2].stop]
-
-        # ignore vals outside of mask
-        img[(mask != 1)] = 0
-
-        self.reference_mean = np.mean(img).astype(np.uint32)
-        self.reference_std = np.std(img).astype(np.uint32)
-
-    def normalise(self, volumes: List[np.ndarray], masks: List[np.ndarray]):
-        """
-        given paths to registered images, apply linear normalisation so that the mean of the roi across all images are
-        the same.
-
-        Create new diretories and place the normalised images in
+        Normalises via bin matching to a reference image.
+        ThresholdAtMeanIntensityOn() makes
 
         Parameters
         ----------
@@ -299,27 +381,23 @@ class NonRegZNormalise(Normaliser):
             Data is normalised in-place
         """
 
-        logging.info('Normalising images to mask')
+        logging.info('Using N4 bias correction')
 
-        for i, vol in enumerate(volumes):
-            try:
-                # get all values inside mask to calculate mean
+        # downsample images
+        downsampler = sitk.ShrinkImageFilter()
 
-                img_for_mean = vol
+        down_sampled_img = downsampler.Execute(img)
 
-                img_for_mean[(masks[i] != 1)] = 0
+        down_sampled_mask = downsampler.Execute(mask)
 
-                # z-norm from
-                # https://www.researchgate.net/publication/229218125_
-                # Improving_runoff_prediction_through_the_assimilation_of_the_ASCAT_soil_moisture_product
-                vol = (vol - np.mean(img_for_mean).astype(np.uint32)) * (np.std(img_for_mean).astype(np.uint32) /
-                                                                         self.reference_std) + self.reference_mean
+        N4 = sitk.N4BiasFieldCorrectionImageFilter()
 
+        N4_vol = N4.Execute(down_sampled_img, down_sampled_mask)
 
-            except TypeError:  # Could be caused by imgarr being a short
-                vol = (vol - np.round(np.mean(img_for_mean))) * (np.round(np.std(img_for_mean))
-                                                                 / np.round(self.reference_std)) + np.round(
-                    self.reference_mean)
+        log_bias_field = N4.GetLogBiasFieldAsImage(img)
+        img = img / sitk.Exp(log_bias_field)
+        sitk.WriteImage(img, "E:/220607_two_way/radiomics_output/test_b4.nrrd")
+
 
 
 class IntensityMaskNormalise(Normaliser):
@@ -331,7 +409,6 @@ class IntensityMaskNormalise(Normaliser):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, *kwargs)
         self.reference_mean = None
-
     def add_reference(self, ref: np.ndarray):
         """
         Add the

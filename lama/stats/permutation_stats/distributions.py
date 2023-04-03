@@ -44,27 +44,36 @@ from logzero import logger
 from tqdm import tqdm
 import random
 import itertools
+from functools import reduce
+
 
 from lama.stats.linear_model import lm_r, lm_sm
 
 home = expanduser('~')
 
 
+def random_combination(iterable, r):
+    "Random selection from itertools.combinations(iterable, r)"
+    pool = tuple(iterable)
+    n = len(pool)
+    indices = sorted(random.sample(range(n), r))
+    return tuple(pool[i] for i in indices)
+
 def recursive_comb_maker(lst, n, steps, i, recurs_results):
     """makes a combination from a list given the n_groups"""
     # generate first set of combinations
-    combs_gen = list(itertools.combinations(lst, n // (steps + 1)))
+    #combs_gen = list(itertools.combinations(lst, n // (steps + 1)))
     # Randomly choose a combination
-    comb_result = random.choices(combs_gen, k=1)
+    #comb_result = random.choices(combs_gen, k=1)
+    comb_result = random_combination(lst, n // (steps + 1))
+    #comb_result = random.choices(combs_gen, k=1)
     # append result into a list
     recurs_results.append(comb_result)
-    #print(comb_result)
     #print(list(lst))
-    # break if you've done the right amount of steps, else call it recurvisely
+    # break if you've done the right amount of steps or you have a lot of combinations, else call it recurvisely
     if i == steps:
         return recurs_results
     else:
-
         return recursive_comb_maker(list(filter(lambda val: val not in comb_result[0], lst)), n, steps, i + 1, recurs_results)
 
 
@@ -148,12 +157,14 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
     logger.info('generating permutations')
     data = data.drop(columns='staging', errors='ignore')
     line_specimen_counts = get_line_specimen_counts(data, two_way=True)
+
     n_groups = get_two_way_n_groups(data)
 
     result = {}
     # now for each label calculate number of combinations we need for each
-    for label in line_specimen_counts:
+    for label in tqdm(line_specimen_counts, total=line_specimen_counts.shape[0]):
         label_indices_result = []
+
         counts = line_specimen_counts[label].value_counts()
 
         number_of_lines = counts[counts.index != 0].sum()  # Drop the lines with zero labels (have been qc'd out)
@@ -181,7 +192,7 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
         # test whether it's possible to have this number of permutations with data structure
         # so for the two-way this wont change
         #print(f'Max combinations for label {label} is {max_combs}')
-        if num_perms > df.max_combs.sum():
+        if float(num_perms) > float(df.max_combs.sum()):
             raise ValueError(f'Max number of combinations is {max_combs}, you requested {num_perms}')
 
 
@@ -236,8 +247,8 @@ def two_way_max_combinations(num_wts: int, n_groups: int) -> int:
     # Total number of combinations given WT n and this mut n
     # I dont need n - you can get the total per group from the wts
     n_per_group = num_wts // n_groups
-    comb_per_group = [(comb(num_wts - (n_per_group * i), n_per_group)) for i in range(0, n_groups)]
-    total_combs_for_n = np.product(comb_per_group)
+    comb_per_group = [(comb(num_wts - (n_per_group * i), n_per_group)) for i in range(n_groups)]
+    total_combs_for_n = reduce(lambda x, y: x * y, comb_per_group)
     # Now weight based on how many lines have this n
     return int(total_combs_for_n)
 
@@ -315,6 +326,7 @@ def null(input_data: pd.DataFrame,
 
     label_names = input_data.drop(['staging', 'line'], axis='columns').columns
 
+
     # Store p-value and t-value results. One tuple (len==num labels) per iteration
     spec_p = []
 
@@ -338,7 +350,7 @@ def null(input_data: pd.DataFrame,
         geno_info = info.copy()
         treat_info = info.copy()
         inter_info = info.copy()
-        for index, meta in info.iterrows():
+        for index, meta in tqdm(info.iterrows(), total=info.shape[0]):
 
             geno_info.loc[:, 'genotype'] = 'wt'  # Set all genotypes to WT
             geno_info.loc[:, 'treatment'] = 'veh'  # Set all treatments to vehicle
@@ -497,7 +509,6 @@ def _null_line_thread(*args) -> List[float]:
     pvalue distribution
     """
     data, num_perms, wt_indx_combinations, label = args
-    print('Generating null for', label)
 
     label = data.columns[0]
 
@@ -555,24 +566,26 @@ def _two_way_null_line_thread(*args) -> List[float]:
 
     # Get combinations of WT indices for current label
     indxs = wt_indx_combinations[label]
+
+    formula = f'{label} ~ genotype * treatment + staging'
     for comb in indxs:
         # set up genotype and treatment
         data.loc[:, 'genotype'] = 'wt'
         data.loc[:,'treatment'] = 'veh'
 
         # mains
-        data.loc[data.index.isin(comb[0][0]), 'genotype'] = 'synth_mut'
-        data.loc[data.index.isin(comb[1][0]), 'treatment'] = 'synth_treat'
+        data.loc[data.index.isin(comb[0]), 'genotype'] = 'synth_mut'
+        data.loc[data.index.isin(comb[1]), 'treatment'] = 'synth_treat'
 
         # interactions
-        data.loc[data.index.isin(comb[2][0]), 'genotype'] = 'synth_mut'
-        data.loc[data.index.isin(comb[2][0]), 'treatment'] = 'synth_treat'
+        data.loc[data.index.isin(comb[2]), 'genotype'] = 'synth_mut'
+        data.loc[data.index.isin(comb[2]), 'treatment'] = 'synth_treat'
 
         # _label_synthetic_mutants(data, n, synthetics_sets_done)
 
         perms_done += 1
 
-        fit = smf.ols(formula=f'{label} ~ genotype * treatment + staging', data=data, missing='drop').fit()
+        fit = smf.ols(formula=formula, data=data, missing='drop').fit()
         # get all pvals except intercept and staging
 
         # fit.pvalues is a series - theefore you have to use .index
@@ -731,7 +744,7 @@ def alternative(input_data: pd.DataFrame,
         interaction = two_grped.get_group(('mut','treat'))
 
         def get_effects(group, inter=False):
-            for specimen_id, row in group.iterrows():
+            for specimen_id, row in tqdm(group.iterrows(), total=group.shape[0]):
                 line_id = 'two_way'
                 df_wt_mut = baseline.append(row)
                 if inter:

@@ -5,12 +5,16 @@ from lama import common
 import nrrd
 import numpy as np
 from scipy import ndimage
-import logging
+from logzero import logger as logging
 
-def main(target_dir):
+def main():
+
+
+    target_dir = Path("E:/try_emap_to_SD/final")
     volpaths = common.get_file_paths(target_dir)
 
     cropped = "cropped"
+    os.makedirs(str(target_dir/cropped), exist_ok=True)
     logging.info("Cropping")
 
     for path in volpaths:
@@ -59,6 +63,9 @@ def main(target_dir):
 
         #crop_vol[l_clip != 0] = np.random.choice([38,39,40])
 
-        nrrd.write(str(target_dir / cropped / os.path.basename(path)), crop_vol, header=v_head)
+        file_path = target_dir / cropped
 
+        nrrd.write(str(file_path/ os.path.basename(path)), crop_vol, header=v_head)
 
+if __name__ == '__main__':
+    main()
