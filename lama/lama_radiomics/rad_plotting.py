@@ -86,6 +86,26 @@ def dimensionality_reduction_plots(_dir: Path, abnormal_embs: list=[], ):
     data['condition'] = data['genotype'] + "_" + data['background']
 
 
+def n_feat_plotting(_dir):
+    print(_dir)
+    cv_filenames = [cv_res for cv_res in common.get_file_paths(folder=_dir, extension_tuple=".csv") if ('cross_fold_results' in str(cv_res))]
+
+    cross_folds = [pd.read_csv(file, index_col=0) for file in cv_filenames]
+
+    print(os.path.basename(cv_filenames[0].parent))
+
+    for i, cf in enumerate(cross_folds):
+        print(i)
+        cf['nfeats'] = int(os.path.basename(cv_filenames[i].parent))
+
+    cv_data = pd.concat(cross_folds)
+
+    return cv_data
+
+
+
+
+
 
 
 def main(_dir):

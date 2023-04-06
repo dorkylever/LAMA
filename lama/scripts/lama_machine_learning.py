@@ -193,7 +193,7 @@ def ml_job_runner(org_dir, n_sample: bool=True, non_tum_path: str=None):
             features = org_df
             features = features[features.columns.drop(list(features.filter(regex="diagnostics")))]
             features.drop(["scanID"], axis=1, inplace=True)
-            feature_reduction.main(features, org=None, rad_file_path=Path(org_dir.parent / "full_results.csv"), n_sampler=False, non_tum_path=non_tum_path)
+            feature_reduction.main(features, org=None, rad_file_path=Path(org_dir.parent / "full_results.csv"), n_sampler=True, non_tum_path=non_tum_path)
 
         # perform feature reduction on a single organ
 

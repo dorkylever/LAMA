@@ -52,8 +52,6 @@ def non_tum_normalise(tum_dataset: pd.DataFrame, non_tum_dataset: pd.DataFrame):
     # ensure that row and col order is maintained
     assert result.index.equals(tum_dataset.index) and result.columns.equals(tum_dataset.columns)
 
-    print(result)
-
     return result
 
 
@@ -417,9 +415,11 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         logging.info("Combining model predictions into one mega model")
 
         m_results.to_csv(str(rad_file_path.parent) + "/" + str(org) + "/CPU_results_" + str(x.shape[1]) + ".csv")
+        m2_results.to_csv(str(rad_file_path.parent) + "/" + str(org) + "/GPU_results_" + str(x.shape[1]) + ".csv")
+
         m_avg = sum_models(models, weights=[1.0 / len(models)] * len(models))
 
-        avrg_filename = str(rad_file_path.parent) + "/" + str(org) + '/GPU_results_' + str(x.shape[1]) + ".cbm"
+        avrg_filename = str(rad_file_path.parent) + "/" + str(org) + '/comb_results_' + str(x.shape[1]) + ".cbm"
 
         m_avg.save_model(avrg_filename)
 
@@ -450,7 +450,8 @@ def main(X, org, rad_file_path, batch_test=None, n_sampler: bool= False, non_tum
             #X_sub = X.groupby('Tumour_Model').apply(lambda x: x.sample(int(n)))
             #X_sub.to_csv(str(n_dir/ "sampled_dataset.csv"))
             #TODO see if this needs parallelising
-            run_feat_red(X, org=None, rad_file_path=n_path, batch_test=batch_test, test_size=n, non_tum_path=non_tum_path)
+            X_clone = X.copy()
+            run_feat_red(X_clone, org=None, rad_file_path=n_path, batch_test=batch_test, test_size=n, non_tum_path=non_tum_path)
 
     else:
         run_feat_red(X, org=org, rad_file_path=rad_file_path, batch_test=batch_test, non_tum_path=non_tum_path)

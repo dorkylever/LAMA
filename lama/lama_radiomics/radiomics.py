@@ -461,6 +461,10 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
             logging.info("Writing: {}".format(rigid_paths[i]))
             sitk.WriteImage(vol, rigid_paths[i], useCompression=True)
 
+        # replace rigids paths for job-file
+        rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
+
+
         logging.info("Creating a job-file for radiomics")
         make_rad_jobs_file(jobs_file_path, rigid_paths)
         logging.info("Job_file_created")

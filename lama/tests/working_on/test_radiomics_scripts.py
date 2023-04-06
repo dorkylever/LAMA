@@ -19,7 +19,8 @@ from lama.lama_radiomics import feature_reduction
 from lama.scripts import lama_machine_learning
 import pacmap
 from lama.scripts import lama_permutation_stats
-from lama.lama_radiomics import radiomics
+from lama.lama_radiomics import radiomics, rad_plotting
+
 
 import SimpleITK as sitk
 stats_cfg = Path(
@@ -479,7 +480,7 @@ def test_BQ_concat():
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
 def test_BQ_mach_learn():
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/features")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/features")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -651,6 +652,13 @@ def test_non_tum_feat_norm():
     results.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/normed_results.csv")
 
 
+def test_n_feat_plotting():
+
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/None/")
+
+    out_file = _dir / "full_cv_dataset.csv"
+    cv_dataset = rad_plotting.n_feat_plotting(_dir)
+    cv_dataset.to_csv(out_file)
 
 
 def test_feat_reduction():
@@ -658,7 +666,7 @@ def test_feat_reduction():
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/")
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/")
 
 
 def test_mach_learn_pipeline_w_non_tum_norm():
