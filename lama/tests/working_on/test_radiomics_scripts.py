@@ -437,7 +437,7 @@ def test_radiomic_plotting():
 
 
 def test_BQ_concat():
-    _dir = Path("Z:/jcsmr/ROLab/Experimental data/Radiomics/Workflow design and trial results/Kyle Drover analysis/220617_BQ_norm_stage_full/sub/sub_normed_features.csv")
+    _dir = Path("Z:/jcsmr/ROLab/Experimental data/Radiomics/Workflow design and trial results/Kyle Drov")
     #_dir = Path("E:/220913_BQ_tsphere/inputs/features/")
 
     # file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
@@ -479,44 +479,48 @@ def test_BQ_concat():
     features.drop(["scanID"], axis=1, inplace=True)
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
-def test_BQ_mach_learn():
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/features")
+def test_BQ_Pacmap():
+    _data = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results.csv")
 
-    file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
-    file_names.sort()
+    data_subset = _data.select_dtypes(include=np.number)
 
-    data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
+    data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
+    data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
 
-    data = pd.concat(
-        data,
-        ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
-        names=['specimen', 'label'])
+    embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=1)
 
-    data['specimen'] = data.index.get_level_values('specimen')
+    # print(data_subset.dropna(axis='columns'))
 
-    _metadata = data['specimen'].str.split('_', expand=True)
+    results = embedding.fit_transform(data_subset.dropna(axis='columns'))
+
+    #color_class = _data.index.get_level_values('Exp')
+
+    # fig, ax = plt.subplots(figsize=[55, 60])
+    # cluster.tsneplot(score=tsne_results, show=True, theme='dark', colorlist=color_class)
+
+    _data['PaCMAP-2d-one'] = results[:, 0]
+    _data['PaCMAP-2d-two'] = results[:, 1]
+
+    fig, ax = plt.subplots(figsize=[56, 60])
+    # data = data[data['condition'] == 'WT_C3HHEH']
+
+    print(_data)
+    g = sns.lmplot(
+        x="PaCMAP-2d-one", y="PaCMAP-2d-two",
+        data=_data,
+        # col_order=['normal', 'abnormal'],
+        #col='Exp',
+        #col_wrap=2,
+        hue="Age",
+        palette='husl',
+        fit_reg=False)
+    g.set(ylim=(np.min(_data['PaCMAP-2d-two']) - 1, np.max(_data['PaCMAP-2d-two']) + 1),
+          xlim=(np.min(_data['PaCMAP-2d-one']) - 1, np.max(_data['PaCMAP-2d-one']) + 1))
+
+    plt.savefig("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/radiomics_2D_PaCMAP_all_cond_v2_just_tum_normalised_age_only.png")
+    plt.close()
 
 
-
-    _metadata.columns = ['Date', 'Exp', 'Contour_Method', 'Tumour_Model', 'Position', 'Age',
-                                                                            'Cage_No.', 'Animal_No.']
-
-
-
-
-    _metadata.reset_index(inplace=True, drop=True)
-    data.reset_index(inplace=True, drop=True)
-    features = pd.concat([_metadata, data], axis=1)
-
-    features.index.name = 'scanID'
-
-    print(features)
-
-    print(str(_dir.parent / "full_results.csv"))
-
-    features.to_csv(str(_dir.parent / "full_results.csv"))
-
-    feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
 
 def test_BQ_mach_learn_non_tum():
@@ -654,11 +658,20 @@ def test_non_tum_feat_norm():
 
 def test_n_feat_plotting():
 
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/None/")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/test_size_0.4/None/")
 
     out_file = _dir / "full_cv_dataset.csv"
     cv_dataset = rad_plotting.n_feat_plotting(_dir)
     cv_dataset.to_csv(out_file)
+
+def test_subsample_plotting():
+
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/")
+
+    out_file = _dir / "entire_full_cv_dataset.csv"
+    cv_dataset = rad_plotting.subsample_plotting(_dir)
+    cv_dataset.to_csv(out_file)
+
 
 
 def test_feat_reduction():
@@ -666,7 +679,7 @@ def test_feat_reduction():
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/")
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/")
 
 
 def test_mach_learn_pipeline_w_non_tum_norm():
@@ -683,7 +696,7 @@ def test_radiomic_org_plotting():
 
     data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
 
-    abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
+    #abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
 
     for i, df in enumerate(data):
         df.index.name = 'org'

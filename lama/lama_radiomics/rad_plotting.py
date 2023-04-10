@@ -1,6 +1,6 @@
 
 from pathlib import Path
-
+import re
 from lama import common
 import os
 import seaborn as sns
@@ -101,6 +101,84 @@ def n_feat_plotting(_dir):
     cv_data = pd.concat(cross_folds)
 
     return cv_data
+
+
+def subsample_plotting(_dir):
+    print(_dir)
+    cv_filenames = [cv_res for cv_res in common.get_file_paths(folder=_dir, extension_tuple=".csv") if ('full_cv_dataset' in str(cv_res))]
+
+    cross_folds = [pd.read_csv(file, index_col=0) for file in cv_filenames]
+
+    print(str(cv_filenames[0]))
+
+    for i, cf in enumerate(cross_folds):
+        print(re.search(r"(?<=test_size_)\d+\.\d+",str(cv_filenames[i])))
+        cf['test_size'] = re.search(r"(?<=test_size_)\d+\.\d+",str(cv_filenames[i])).group(0)
+
+    cv_data = pd.concat(cross_folds)
+
+    return cv_data
+
+
+
+
+
+
+
+def BQ_dimensionality_reduction_plots(_dir: Path, abnormal_embs: list=[], ):
+    file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
+    file_names.sort()
+
+    data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
+
+
+    for i, df in enumerate(data):
+        df.index.name = 'org'
+        df.name = str(file_names[i]).split(".")[0].split("/")[-1]
+        df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
+        df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i])) | ('BL6' in str(file_names[i]))) else \
+            'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
+
+        df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
+
+    data = pd.concat(
+        data,
+        ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
+        names=['specimen', 'org'])
+
+    line_file = _dir.parent / "full_results.csv"
+
+    org_dir = _dir.parent / "organs"
+
+    os.makedirs(org_dir, exist_ok=True)
+    print(data.columns)
+
+    for org in data.index.get_level_values('org').unique():
+        data[data.index.get_level_values('org') == org].to_csv(str(org_dir) + "/results_" + str(org) + ".csv")
+
+    data.to_csv(line_file)
+
+    data_subset = data.select_dtypes(include=np.number)
+
+    #data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
+    #data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
+
+    embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=1)
+
+    # print(data_subset.dropna(axis='columns'))
+
+    results = embedding.fit_transform(data_subset.dropna(axis='columns'))
+
+    color_class = data.index.get_level_values('org')
+
+    # fig, ax = plt.subplots(figsize=[55, 60])
+    # cluster.tsneplot(score=tsne_results, show=True, theme='dark', colorlist=color_class)
+
+    data['PaCMAP-2d-one'] = results[:, 0]
+    data['PaCMAP-2d-two'] = results[:, 1]
+    data['org'] = data.index.get_level_values('org')
+    data['specimen'] = data.index.get_level_values('specimen')
+    data['condition'] = data['genotype'] + "_" + data['background']
 
 
 
