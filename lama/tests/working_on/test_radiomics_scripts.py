@@ -19,12 +19,19 @@ from lama.lama_radiomics import feature_reduction
 from lama.scripts import lama_machine_learning
 import pacmap
 from lama.scripts import lama_permutation_stats
-from lama.lama_radiomics import radiomics
+from lama.lama_radiomics import radiomics, rad_plotting
+
 
 import SimpleITK as sitk
 stats_cfg = Path(
     "C:/Users/Kyle/PycharmProjects/LAMA/lama/tests/configs/permutation_stats/perm_no_qc.yaml")
 from lama.stats.permutation_stats.run_permutation_stats import get_radiomics_data
+
+
+stats_cfg_v2 = Path(
+    "C:/LAMA/lama/tests/configs/permutation_stats/perm_no_qc_just_ovs.yaml")
+
+
 
 def test_denoising():
     file_path = Path("E:/220204_BQ_dataset/221218_BQ_run/registrations/rigid/flipped/200721_MPTLVo3_CT_4T1_Ms_D7_C1_002.nrrd")
@@ -37,10 +44,8 @@ def test_denoising():
 
 
 
-
-
 def test_radiomics():
-        cpath =  Path('C:/LAMA/lama/tests/configs/lama_radiomics/radiomics_config_gina.toml')
+        cpath =  Path('C:/LAMA/lama/tests/configs/lama_radiomics/radiomics_config.toml')
         c = cfg_load(cpath)
 
         target_dir = Path(c.get('target_dir'))
@@ -49,14 +54,11 @@ def test_radiomics():
 
         norm_methods = c.get('norm_methods')
 
-
         norm_label = c.get('norm_label')
 
         spherify = c.get('spherify')
 
         ref_vol_path = Path(c.get('ref_vol_path')) if c.get('ref_vol_path') is not None else None
-
-
 
         norm_dict = {
             "histogram": normalise.IntensityHistogramMatch(),
@@ -72,8 +74,19 @@ def test_radiomics():
 
             norm_meths = None
         logging.info("Starting Radiomics")
-        radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.IntensityHistogramMatch(), norm_label=norm_label,
-                             spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=False)
+        radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.NonRegMaskNormalise(), norm_label=norm_label,
+                             spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=True, scan_dir='imgs', tumour_dir='full_contours', stage_dir='stage_labels')
+
+
+def test_permutation_stats_just_ovs():
+    """
+    Run the whole permutation based stats pipeline.
+    Copy the output from a LAMA registrations test run, and increase or decrease the volume of the mutants so we get
+    some hits
+
+    """
+    lama_permutation_stats.run(stats_cfg_v2)
+
 
 
 def test_radiomic_plotting():
@@ -423,7 +436,7 @@ def test_radiomic_plotting():
 
 
 def test_BQ_concat():
-    _dir = Path("Z:/jcsmr/ROLab/Experimental data/Radiomics/Workflow design and trial results/Kyle Drover analysis/220617_BQ_norm_stage_full/sub/sub_normed_features.csv")
+    _dir = Path("Z:/jcsmr/ROLab/Experimental data/Radiomics/Workflow design and trial results/Kyle Drov")
     #_dir = Path("E:/220913_BQ_tsphere/inputs/features/")
 
     # file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
@@ -465,44 +478,48 @@ def test_BQ_concat():
     features.drop(["scanID"], axis=1, inplace=True)
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
-def test_BQ_mach_learn():
-    _dir = Path("C:/test/features/")
+def test_BQ_Pacmap():
+    _data = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
 
-    file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
-    file_names.sort()
+    data_subset = _data.select_dtypes(include=np.number)
 
-    data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
+    data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
+    data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
 
-    data = pd.concat(
-        data,
-        ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
-        names=['specimen', 'label'])
+    embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=1)
 
-    data['specimen'] = data.index.get_level_values('specimen')
+    # print(data_subset.dropna(axis='columns'))
 
-    _metadata = data['specimen'].str.split('_', expand=True)
+    results = embedding.fit_transform(data_subset.dropna(axis='columns'))
+
+    #color_class = _data.index.get_level_values('Exp')
+
+    # fig, ax = plt.subplots(figsize=[55, 60])
+    # cluster.tsneplot(score=tsne_results, show=True, theme='dark', colorlist=color_class)
+
+    _data['PaCMAP-2d-one'] = results[:, 0]
+    _data['PaCMAP-2d-two'] = results[:, 1]
+
+    fig, ax = plt.subplots(figsize=[56, 60])
+    # data = data[data['condition'] == 'WT_C3HHEH']
+
+    print(_data)
+    g = sns.lmplot(
+        x="PaCMAP-2d-one", y="PaCMAP-2d-two",
+        data=_data,
+        # col_order=['normal', 'abnormal'],
+        #col='Exp',
+        #col_wrap=2,
+        hue="Tumour_Model",
+        palette='husl',
+        fit_reg=False)
+    g.set(ylim=(np.min(_data['PaCMAP-2d-two']) - 1, np.max(_data['PaCMAP-2d-two']) + 1),
+          xlim=(np.min(_data['PaCMAP-2d-one']) - 1, np.max(_data['PaCMAP-2d-one']) + 1))
+
+    plt.savefig("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/radiomics_2D_PaCMAP_SMOTED.png")
+    plt.close()
 
 
-
-    _metadata.columns = ['Date', 'Exp', 'Contour_Method', 'Tumour_Model', 'Position', 'Age',
-                                                                            'Cage_No.', 'Animal_No.']
-
-
-
-
-    _metadata.reset_index(inplace=True, drop=True)
-    data.reset_index(inplace=True, drop=True)
-    features = pd.concat([_metadata, data], axis=1)
-
-    features.index.name = 'scanID'
-
-    print(features)
-
-    print(str(_dir.parent / "full_results.csv"))
-
-    features.to_csv(str(_dir.parent / "full_results.csv"))
-
-    feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
 
 def test_BQ_mach_learn_non_tum():
@@ -547,7 +564,7 @@ def test_BQ_mach_learn_non_tum():
 
 
 def test_BQ_mach_learn_batch_sp():
-    _dir = Path("E:/220913_BQ_tsphere/inputs/features/")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/features")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -630,17 +647,49 @@ def test_BQ_concat_batch():
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"), batch_test=True)
 
 
+def test_non_tum_feat_norm():
+    from lama.lama_radiomics.feature_reduction import non_tum_normalise
+    tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/full_results.csv", index_col=0)
+    non_tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv", index_col=0)
+    results = non_tum_normalise(tum, non_tum)
+    results.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/normed_results.csv")
+
+
+def test_n_feat_plotting():
+
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/test_size_0.2/None/")
+
+    out_file = _dir / "full_cv_dataset.csv"
+    cv_dataset = rad_plotting.n_feat_plotting(_dir)
+    cv_dataset.to_csv(out_file)
+
+def test_subsample_plotting():
+
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/")
+
+    out_file = _dir / "entire_train_test_part_dataset.csv"
+    cv_dataset = rad_plotting.subsample_plotting(_dir)
+    cv_dataset.to_csv(out_file)
 
 
 
-
-@pytest.mark.skip
 def test_feat_reduction():
+    #features = pd.read_csv(, index_col=0)
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/230129_bq_tester/norm_methods/", n_sample=True)
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/")
 
+def test_mach_learn_pipeline_v2():
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/results_for_ml/")
+
+def test_mach_learn_pipeline_v3():
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/")
+
+def test_mach_learn_pipeline_w_non_tum_norm():
+    non_tum_path = "E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv"
+
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/results_for_ml/", non_tum_path = non_tum_path)
 
 @pytest.mark.skip
 def test_radiomic_org_plotting():
@@ -651,7 +700,7 @@ def test_radiomic_org_plotting():
 
     data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
 
-    abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
+    #abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
 
     for i, df in enumerate(data):
         df.index.name = 'org'

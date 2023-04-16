@@ -19,11 +19,12 @@ from scipy import ndimage
 import raster_geometry as rg
 import subprocess
 
-
+# test push
+# lets try this
 JOBFILE_NAME = 'radiomics_jobs.csv'
 
 
-def extract_registrations(root_dir, labs_of_interest=None, norm_label=None,  fnames = None, stats_mask: bool=False):
+def extract_registrations(root_dir, labs_of_interest=None, outdir_name=None, norm_label=None,  fnames = None, stats_mask: bool=False):
     '''
 
     either extracts the rigid registrations (i.e. the volumes)
@@ -46,7 +47,7 @@ def extract_registrations(root_dir, labs_of_interest=None, norm_label=None,  fna
         # save to label folder
 
         outdir_string = "stage_labels" if norm_label else "stats_mask" if stats_mask else "inverted_labels"
-        query_string = 'inverted_stats_mask' if stats_mask else outdir_string
+        query_string = outdir_name if outdir_name else 'inverted_stats_mask' if stats_mask else outdir_string
 
         outdir = rad_dir / outdir_string
         os.makedirs(outdir, exist_ok=True)
@@ -85,9 +86,11 @@ def extract_registrations(root_dir, labs_of_interest=None, norm_label=None,  fna
         # extract the rigid
         outdir = rad_dir / "rigids"
         os.mkdir(outdir)
-
-        reg_paths = [spec_path for spec_path in common.get_file_paths(root_dir) if ('registrations' in str(spec_path))]
-        file_paths = [spec_path for spec_path in reg_paths if ('rigid' in str(spec_path))]
+        if outdir_name:
+            file_paths = [spec_path for spec_path in common.get_file_paths(root_dir) if (outdir_name in str(spec_path))]
+        else:
+            reg_paths = [spec_path for spec_path in common.get_file_paths(root_dir) if ('registrations' in str(spec_path))]
+            file_paths = [spec_path for spec_path in reg_paths if ('rigid' in str(spec_path))]
 
 
         # just an easy way to load the images
@@ -105,7 +108,7 @@ def extract_registrations(root_dir, labs_of_interest=None, norm_label=None,  fna
         sitk.WriteImage(vol, file_name, useCompression=True)
 
 
-    return extracts
+    return extracts, file_paths
 
 
 def make_rad_jobs_file(jobs_file: Path, file_paths: list):
@@ -167,6 +170,7 @@ def pyr_normaliser(_dir, _normaliser, scans_imgs, masks: list = None, fold: bool
 
     # Do the normalisation
     if isinstance(_normaliser, normalise.NonRegMaskNormalise):
+
         # checks if a ref mean has been calculated and then creates if missing
         if not _normaliser.reference_mean:
             #if you passed a non-normal label for reference
@@ -187,7 +191,6 @@ def pyr_normaliser(_dir, _normaliser, scans_imgs, masks: list = None, fold: bool
                 ref_vol, ref_mask = _normaliser.get_all_wt_vols_and_masks(_dir)
 
             _normaliser.add_reference(ref_vol, ref_mask)
-
         _normaliser.normalise(scans_imgs, masks, fold=fold, temp_dir=_dir)
 
     elif isinstance(_normaliser, normalise.IntensityHistogramMatch):
@@ -208,7 +211,7 @@ def pyr_normaliser(_dir, _normaliser, scans_imgs, masks: list = None, fold: bool
 
 def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None):
     full_results = pd.Series([])
-    #lab.CopyInformation(img)
+    lab.CopyInformation(img)
 
     arr = sitk.GetArrayFromImage(lab)
 
@@ -315,7 +318,7 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
                          norm_method=normalise.IntensityN4Normalise(),
                          norm_label=None, spherify=None,
                          ref_vol_path=None,
-                         make_job_file: bool=False, fold: bool=False):
+                         make_job_file: bool=False, fold: bool=False, scan_dir=None, tumour_dir=None, stage_dir=None):
     '''
     Performs the pyradiomic calculations
 
@@ -345,26 +348,69 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
     if make_job_file:
         # extract the registrations if the job file doesn't exist and normalise
         if not os.path.exists(str(rad_dir)):
+
             os.makedirs(rad_dir, exist_ok=True)
             logging.info("Extracting Rigids")
-            rigids = extract_registrations(target_dir)
+            rigids, rigid_paths = extract_registrations(target_dir, outdir_name=scan_dir)
             logging.info("Extracting Inverted Labels")
-            labels = extract_registrations(target_dir, labs_of_int)
+            labels, label_paths = extract_registrations(target_dir, labs_of_int, outdir_name=tumour_dir)
 
             if norm_label:
                 logging.info("Extracting Stage labels")
-                stage_labels = extract_registrations(target_dir, labs_of_int, norm_label=True)
+                stage_labels, stage_paths = extract_registrations(target_dir, labs_of_int, outdir_name=stage_dir, norm_label=True)
             else:
                 logging.info("Extracting Inverted Stats Masks")
-                inv_stats_masks = extract_registrations(target_dir, labs_of_int, stats_mask=True)
+                inv_stats_masks, inv_mask_paths = extract_registrations(target_dir, labs_of_int, stats_mask=True)
+
+            logging.info("checking for mismatching")
+            rigid_basenames = {os.path.basename(path) for path in rigid_paths}
+            label_basenames = {os.path.basename(path) for path in label_paths}
+            mask_basenames = {os.path.basename(path) for path in stage_paths} if norm_label else {os.path.basename(path)
+                                                                                                  for path in
+                                                                                                  inv_mask_paths}
+            try:
+                assert all(basename_set == rigid_basenames for basename_set in
+                       [label_basenames, mask_basenames]), "Basenames are not identical"
+                logging.info("Order is correct")
+
+            except AssertionError as e:
+                logging.info("Order is not correct, correcting")
+                rigid_dict = {os.path.basename(path): rigid for path, rigid in zip(rigid_paths, rigids)}
+                label_dict = {os.path.basename(path): label for path, label in zip(label_paths, labels)}
+                mask_dict = {os.path.basename(path): mask for path, mask in
+                             zip(stage_paths if norm_label else inv_mask_paths,
+                                 stage_labels if norm_label else inv_stats_masks)}
+
+                # reset lists and order via dict
+                rigids = [rigid_dict[basename] for basename in rigid_basenames]
+                labels = [label_dict[basename] for basename in rigid_basenames]
+                if norm_label:
+                    stage_labels = [mask_dict[basename] for basename in rigid_basenames]
+                else:
+                    inv_stats_masks = [mask_dict[basename] for basename in rigid_basenames]
+
+            if scan_dir and norm_label:
+                logging.info("Correcting Metadata")
+                #so if the user is providing different directories - it's likely BQ lab and th
+                for i, lab in enumerate(stage_labels):
+                    lab.CopyInformation(rigids[i])
+                    labels[i].CopyInformation(rigids[i])
+
 
         else: # good for debugging if normalisation stuffs up
             logging.info("loading rigids")
             rigids = [common.LoadImage(path).img for path in common.get_file_paths(str(rad_dir / "rigids"))]
-            # labels = [common.LoadImage(path) for path in common.get_file_paths(str(rad_dir / "inverted_labels"))]
+            labels = [common.LoadImage(path).img for path in common.get_file_paths(str(rad_dir / "inverted_labels"))]
             logging.info("loading stats masks")
             inv_stats_masks = [common.LoadImage(path).img for path in common.get_file_paths(str(rad_dir / "stats_mask"))]
             stage_labels = [common.LoadImage(path).img for path in common.get_file_paths(str(rad_dir / "stage_labels"))]
+
+            if scan_dir and norm_label:
+                # so if the user is providing different directories - it's likely BQ lab and th
+                for i, lab in enumerate(stage_labels):
+                    lab.CopyInformation(rigids[i])
+                    labels[i].CopyInformation(rigids[i])
+
 
         #logging.info("Denoising")
 
@@ -406,13 +452,18 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
 
 
         logging.info("Writing Normalised Rigids")
-        rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
+        if 'rigid_paths' not in locals():
+            rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
         # sort should be identical:
         #rigid_paths.sort(key=lambda x: os.path.basename(x))
 
         for i, vol in enumerate(rigids):
             logging.info("Writing: {}".format(rigid_paths[i]))
             sitk.WriteImage(vol, rigid_paths[i], useCompression=True)
+
+        # replace rigids paths for job-file
+        rigid_paths = [common.LoadImage(path).img_path for path in common.get_file_paths(str(rad_dir / "rigids"))]
+
 
         logging.info("Creating a job-file for radiomics")
         make_rad_jobs_file(jobs_file_path, rigid_paths)
