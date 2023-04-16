@@ -105,17 +105,27 @@ def n_feat_plotting(_dir):
 
 def subsample_plotting(_dir):
     print(_dir)
-    cv_filenames = [cv_res for cv_res in common.get_file_paths(folder=_dir, extension_tuple=".csv") if ('full_cv_dataset' in str(cv_res))]
+    cv_filenames = [cv_res for cv_res in common.get_file_paths(folder=_dir, extension_tuple=".csv") if ('CPU_results' in str(cv_res))]
 
     cross_folds = [pd.read_csv(file, index_col=0) for file in cv_filenames]
 
-    print(str(cv_filenames[0]))
+    # create a new list to store the updated cross_folds
+    updated_cross_folds = []
 
     for i, cf in enumerate(cross_folds):
-        print(re.search(r"(?<=test_size_)\d+\.\d+",str(cv_filenames[i])))
         cf['test_size'] = re.search(r"(?<=test_size_)\d+\.\d+",str(cv_filenames[i])).group(0)
+        cf['nfeats'] = int(re.search(r'\d+\.csv$',os.path.basename(cv_filenames[i])).group(0).replace('.csv', ''))
+        lst = cf['results'].tolist()
+        lst_dicts = [eval(d) for d in lst]
+        df = pd.DataFrame(lst_dicts)
+        cf = pd.concat([cf.drop(['results'], axis=1), df], axis=1)
 
-    cv_data = pd.concat(cross_folds)
+        updated_cross_folds.append(cf)
+
+
+
+
+    cv_data = pd.concat(updated_cross_folds)
 
     return cv_data
 

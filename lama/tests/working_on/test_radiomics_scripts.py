@@ -480,7 +480,7 @@ def test_BQ_concat():
     feature_reduction.main(features, org = None, rad_file_path = Path(_dir.parent / "full_results.csv"))
 
 def test_BQ_Pacmap():
-    _data = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results.csv")
+    _data = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
 
     data_subset = _data.select_dtypes(include=np.number)
 
@@ -511,13 +511,13 @@ def test_BQ_Pacmap():
         # col_order=['normal', 'abnormal'],
         #col='Exp',
         #col_wrap=2,
-        hue="Age",
+        hue="Tumour_Model",
         palette='husl',
         fit_reg=False)
     g.set(ylim=(np.min(_data['PaCMAP-2d-two']) - 1, np.max(_data['PaCMAP-2d-two']) + 1),
           xlim=(np.min(_data['PaCMAP-2d-one']) - 1, np.max(_data['PaCMAP-2d-one']) + 1))
 
-    plt.savefig("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/radiomics_2D_PaCMAP_all_cond_v2_just_tum_normalised_age_only.png")
+    plt.savefig("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/radiomics_2D_PaCMAP_SMOTED.png")
     plt.close()
 
 
@@ -565,7 +565,7 @@ def test_BQ_mach_learn_non_tum():
 
 
 def test_BQ_mach_learn_batch_sp():
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/features")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/features")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -650,7 +650,7 @@ def test_BQ_concat_batch():
 
 def test_non_tum_feat_norm():
     from lama.lama_radiomics.feature_reduction import non_tum_normalise
-    tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_15_res/results_for_ml/full_results.csv", index_col=0)
+    tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/full_results.csv", index_col=0)
     non_tum = pd.read_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv", index_col=0)
     results = non_tum_normalise(tum, non_tum)
     results.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/normed_results.csv")
@@ -658,7 +658,7 @@ def test_non_tum_feat_norm():
 
 def test_n_feat_plotting():
 
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/test_size_0.4/None/")
+    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/test_size_0.2/None/")
 
     out_file = _dir / "full_cv_dataset.csv"
     cv_dataset = rad_plotting.n_feat_plotting(_dir)
@@ -668,7 +668,7 @@ def test_subsample_plotting():
 
     _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/")
 
-    out_file = _dir / "entire_full_cv_dataset.csv"
+    out_file = _dir / "entire_train_test_part_dataset.csv"
     cv_dataset = rad_plotting.subsample_plotting(_dir)
     cv_dataset.to_csv(out_file)
 
@@ -679,8 +679,13 @@ def test_feat_reduction():
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/")
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/")
 
+def test_mach_learn_pipeline_v2():
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/results_for_ml/")
+
+def test_mach_learn_pipeline_v3():
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/")
 
 def test_mach_learn_pipeline_w_non_tum_norm():
     non_tum_path = "E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_non_tum_res/results_for_ml/full_results.csv"

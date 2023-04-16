@@ -234,6 +234,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         X['Tumour_Model'] = X['Tumour_Model'].map({'4T1R': 0, 'CT26R': 1}).astype(int)
         X.set_index('Tumour_Model', inplace=True)
         X.drop(['Date', 'Animal_No.'], axis=1, inplace=True)
+        X = X.loc[:, ~X.columns.str.contains('shape')]
         X.dropna(axis=1, inplace=True)
 
 
@@ -254,6 +255,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
     # clone X for final test
     X_to_test = X
 
+    corr_feats_v2 = correlation(X, rad_file_path.parent, 0.9, org=org)
 
     org_dir = rad_file_path.parent / str(org)
 
@@ -265,6 +267,8 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
     n_test = X[X.index == 1].shape[0]
 
     X = smote_oversampling(X, n_test) if n_test < 5 else smote_oversampling(X)
+
+    X.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
 
     logging.info("fitting model to training data")
     m = CatBoostClassifier(iterations=1000, task_type='GPU', verbose=250, train_dir=org_dir)
@@ -431,7 +435,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
 def main(X, org, rad_file_path, batch_test=None, n_sampler: bool= False, non_tum_path: str=None):
     if n_sampler:
-        n_fractions = list(np.arange(0.2, 1.2, 0.2))
+        n_fractions = list(np.arange(0.2, 1.2, 0.1))
 
         # remove comments to turn on a
         # complete_dataset = X.copy()
