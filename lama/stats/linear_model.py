@@ -23,11 +23,27 @@ import statsmodels.formula.api as smf
 
 from lama import common
 from tqdm import tqdm
+from joblib import Parallel, delayed
 
 LM_SCRIPT = str(common.lama_root_dir / 'stats' / 'rscripts' / 'lmFast.R')
 
 # If debugging, don't delete the temp files used for communication with R so they can be used for R debugging.
 DEBUGGING = True
+
+def calculate_p_t(df, col, two_way):
+    if not df[f'x{col}'].any():
+        p = np.nan
+        t = np.nan
+    else:
+        # so is meant to improve performance
+        formula = f'x{col} ~ genotype * treatment + staging' if two_way else f'x{col} ~ genotype + staging'
+        fit = smf.ols(formula=formula, data=df, missing='drop').fit()
+
+        p = fit.pvalues[~fit.pvalues.index.isin(['Intercept', 'staging'])] if two_way else fit.pvalues[
+            'genotype[T.wt]']
+        t = fit.tvalues[~fit.tvalues.index.isin(['Intercept', 'staging'])] if two_way else fit.tvalues[
+            'genotype[T.wt]']
+    return p, t
 
 def lm_r(data: np.ndarray, info: pd.DataFrame, plot_dir: Path = None, boxcox: bool = False, use_staging: bool = True,
          two_way: bool = False) -> Tuple[np.ndarray, np.ndarray]:
@@ -188,23 +204,13 @@ def lm_sm(data: np.ndarray, info: pd.DataFrame, plot_dir: Path = None,
     d = pd.DataFrame(data, index=info.index, columns=[f'x{x}' for x in range(data.shape[1])])
     df = pd.concat([d, info], axis=1)  # Data will be given numberic labels
 
-    for col in range(data.shape[1]):
+    pvals = []
+    tvals = []
 
-        if not df[f'x{col}'].any():
-            p = np.nan
-            t = np.nan
-        else:
-            # so is meant to improve performance
-            formula = f'x{col} ~ genotype * treatment + staging' if two_way else f'x{col} ~ genotype + staging'
-            fit = smf.ols(formula=formula, data=df, missing='drop').fit()
-
-            p = fit.pvalues[~fit.pvalues.index.isin(['Intercept', 'staging'])] if two_way else fit.pvalues[
-                'genotype[T.wt]']
-            t = fit.tvalues[~fit.tvalues.index.isin(['Intercept', 'staging'])] if two_way else fit.tvalues[
-               'genotype[T.wt]']
+    results = Parallel(n_jobs=-1)(delayed(calculate_p_t)(df, col, two_way) for col in range(data.shape[1]))
+    for p, t in results:
         pvals.append(p)
         tvals.append(t)
-
     # print(dir(fit))
     p_all = np.array(pvals)
 
