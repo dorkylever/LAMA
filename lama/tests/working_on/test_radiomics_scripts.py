@@ -90,38 +90,38 @@ def test_permutation_stats_just_ovs():
 
 
 def test_radiomic_plotting():
-    _dir = Path("E:/220607_two_way/g_by_back_data/radiomics_output/features/")
+    _dir = Path("C:/organs/")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
 
     data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
 
-    abnormal_embs = ['22300_e8','22300_e6', '50_e5']
+    #abnormal_embs = ['22300_e8','22300_e6', '50_e5']
 
-    for i, df in enumerate(data):
-        df.index.name = 'org'
-        df.name = str(file_names[i]).split(".")[0].split("/")[-1]
-        df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
-        df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i]))|('BL6' in str(file_names[i]))) else \
-            'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
+    #for i, df in enumerate(data):
+    #    df.index.name = 'org'
+    #    df.name = str(file_names[i]).split(".")[0].split("/")[-1]
+    #    df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
+    #    df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i]))|('BL6' in str(file_names[i]))) else \
+    #        'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
 
-        df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
+    #   df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
 
     data = pd.concat(
         data,
         ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
         names=['specimen', 'org'])
 
-    line_file = _dir.parent / "full_results.csv"
+    line_file = _dir / "full_results.csv"
 
     org_dir =_dir.parent / "organs"
 
     os.makedirs(org_dir, exist_ok=True)
-    print(data.columns)
 
-    for org in data.index.get_level_values('org').unique():
-        data[data.index.get_level_values('org') == org].to_csv(str(org_dir)+"/results_" + str(org)+ ".csv")
+
+    #for org in data.index.get_level_values('org').unique():
+    #    data[data.index.get_level_values('org') == org].to_csv(str(org_dir)+"/results_" + str(org)+ ".csv")
 
     data.to_csv(line_file)
 
@@ -130,7 +130,7 @@ def test_radiomic_plotting():
     data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
     data_subset = data_subset.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
 
-    embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=1)
+    embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=250)
 
 
 
@@ -149,6 +149,21 @@ def test_radiomic_plotting():
     data['specimen'] = data.index.get_level_values('specimen')
     data['condition'] = data['genotype'] + "_" + data['background']
 
+    corr = data.corr(method='spearman')
+
+    # Extract correlation values for 'PaCMAP-d2-one' column
+    corr_values = corr.filter(like='PaCMAP', axis=1)
+    corr_values = corr_values.filter(like='shape', axis=0)
+
+
+    print(corr_values)
+    # Plot heatmap
+    fig, ax = plt.subplots(figsize=[56, 60])
+
+    sns.heatmap(corr_values, ax=ax, cmap='coolwarm', annot=True, cbar=True)
+    plt.savefig("C:/features/corr_heatmap.png")
+    plt.close()
+
 
     fig, ax = plt.subplots(figsize=[56, 60])
     #data = data[data['condition'] == 'WT_C3HHEH']
@@ -166,7 +181,7 @@ def test_radiomic_plotting():
           xlim=(np.min(data['PaCMAP-2d-one'])-10, np.max(data['PaCMAP-2d-one'])+10))
 
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_all_cond_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_all_cond_v2.png")
     plt.close()
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -184,7 +199,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_C3H_wt_org_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_C3H_wt_org_v2.png")
     plt.close()
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -200,7 +215,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_C3H_map_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_C3H_map_v2.png")
     plt.close()
 
     het_c3h_data = data[data['condition'] == 'HET_C3HHEH']
@@ -217,7 +232,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_C3H_hets_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_C3H_hets_v2.png")
     plt.close()
 
     wt_b6_data = data[data['condition'] == 'WT_C57BL6N']
@@ -234,7 +249,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_b6_map_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_b6_map_v2.png")
     plt.close()
 
     wt_f1_data = data[data['condition'] == 'WT_C57BL6N']
@@ -251,7 +266,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_f1_map_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_f1_map_v2.png")
     plt.close()
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -267,7 +282,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_b6_specs_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_b6_specs_v2.png")
     plt.close()
 
     het_b6_data = data[data['condition'] == 'HET_C57BL6N']
@@ -284,7 +299,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_b6_hets_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_b6_hets_v2.png")
     plt.close()
 
     het_f1_data = data[data['condition'] == 'F1']
@@ -301,7 +316,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_f1_hets_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_f1_hets_v2.png")
     plt.close()
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -317,122 +332,8 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/features/radiomics_2D_PaCMAP_HPE_v2.png")
+    plt.savefig("C:/features/radiomics_2D_PaCMAP_HPE_v2.png")
     plt.close()
-
-
-
-    #fig, ax = plt.subplots((len(data.index.levels[-1]) // 5) + 1, 5, figsize=[60, 80], sharex=True, sharey=True)
-
-    #for i, row in enumerate(data.index.levels[-1]):
-    #    fig, ax = plt.subplots(figsize=[27, 30])
-    #    print(row)
-    #    sns.lmplot(
-    #        x="tsne-3d-one", y="tsne-2d-two",
-    #        hue="org",
-    #        col="condition",
-    #        palette="husl",
-    #        data=data.loc[row],
-    #        legend="full",
-    #        fit_reg=False,
-    #        legend_out=True)
-    #    file_name = "E:/220606_two_way/g_by_back_data/radiomics_output/sample_features/" + str(row) + ".png"
-    #    plt.savefig(file_name)
-    #    plt.close()
-
-    #    sns.relplot(
-    #        x="tsne-3d-one", y="tsne-2d-two",
-    #        data=data,
-    #        hue="org",
-    #        palette='husl',
-    #        alpha=-1.3,
-    #        ax=ax[(i+0)//5, (i+1)%5])
-
-
-    #fig.savefig("E:/220720_Amrit_radiomics/radiomics_2D_tsne_overlay.png")
-    #plt.close()
-
-    # remove diagnostics
-    # data.index = data['specimen']
-    # print(data.index.str.rsplit('_', 1))
-    # data = data[data.columns.drop(list(data.filter(regex="diagnostics")))]
-
-    # _metadata = pd.DataFrame(data.index.str.rsplit('_', 1))
-
-    # print(_metadata)
-
-    # _metadata[['Embryo','Genotype']] = pd.DataFrame(_metadata.specimen.tolist(), index=_metadata.index)
-
-    # print(_metadata)
-
-    # _metadata = _metadata.drop(columns=['specimen'])
-
-    # _metadata.reset_index(inplace=True, drop=True)
-    # data.reset_index(inplace=True, drop=True)
-
-    # data=data.drop(columns=['specimen'])
-
-    # print(data)
-    # umap_organs(data, Path("E:/Bl5_data/211014_g_by_back/umap.png"), _metadata=_metadata)
-
-
-    data.drop(['org', 'condition', 'HPE'], axis=1, inplace=True)
-
-    data = data.select_dtypes(include=np.number)
-
-    #data = data.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
-
-    data = data.apply(lambda x: (x - x.mean()) / x.std(), axis=1)
-
-
-    #data = data.apply(lambda x: (x - x.mean()) / x.std(), axis=0)
-
-    #sns.set(font_scale=0.5)
-
-    print("Data after drop", data)
-
-    print(data.index.get_level_values('org'), len(data.index.get_level_values('org')))
-
-    #data = data[~np.isin(data.index.get_level_values('org'), 27.0)]
-
-    print(data)
-    data.drop(27.0, level=1, axis=0, inplace=True)
-    print(data, any(np.isin(data.index.get_level_values('org'), 27.0)))
-    print(data.index.get_level_values('org'))
-
-    for i, org in enumerate(data.index.levels[1]):
-        fig, ax = plt.subplots(figsize=[14, 15])
-        #sns.set(font_scale=0.5)
-        o_data = data[np.isin(data.index.get_level_values('org'), org)]
-        o_data.dropna(axis=1, inplace=True)
-
-        if org == 27.0:
-            continue
-
-        print(org)
-
-        o_data.drop(o_data.std()[(o_data.std() == 0)].index, axis=1, inplace=True)
-
-
-        #o_data.to_csv("E:/org_df.csv")
-
-        #import scipy.spatial.distance as ssd
-
-
-        sns.clustermap(o_data.T,
-                    figsize=[148.5, 210],
-                    dendrogram_ratio=0.1,
-                    colors_ratio=0.1,
-                    #z_score=0,
-                    metric="correlation",
-                    #cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=40, n=512, center="light", as_cmap=True),
-                    #cbar_kws={'Genotype': 'Background'},
-                    square=True,
-                    xticklabels=True,
-                    yticklabels=True)
-        plt.tight_layout()
-        plt.savefig("E:/220607_two_way/g_by_back_data/radiomics_output/wt_C3H_heatmap_"+str(org)+".png")
-        plt.close()
 
 
 def test_BQ_concat():
