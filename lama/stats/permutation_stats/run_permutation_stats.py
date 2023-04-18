@@ -791,7 +791,7 @@ def run(wt_dir: Path,
 
     # Get the null distributions
     logging.info('Generating null distribution')
-    line_null, specimen_null = distributions.null(data, num_perms, two_way=two_way)
+    line_null, specimen_null = distributions.null(data, num_perms, two_way=two_way, _dir = dists_out)
 
     # with open(dists_out / 'null_ids.yaml', 'w') as fh:
     #     yaml.dump(null_ids, fh)

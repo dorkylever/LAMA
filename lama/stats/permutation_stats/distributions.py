@@ -26,7 +26,8 @@ TDOD: If the relabelled baselines were relabelled as 'mutant' instead og 'hom' o
 p-values, tvalues could be obtained from the same call the lm() as in the standard stats module.
 
 """
-
+import os
+import sys
 from os.path import expanduser
 from typing import Union, Tuple, List
 import random
@@ -45,11 +46,13 @@ from tqdm import tqdm
 import random
 import itertools
 from functools import reduce
+from logzero import logger as logging
 
 
 from lama.stats.linear_model import lm_r, lm_sm
 
 home = expanduser('~')
+
 
 
 def random_combination(iterable, r):
@@ -290,7 +293,7 @@ def get_line_specimen_counts(input_data: pd.DataFrame, two_way: bool = False) ->
 
 
 def null(input_data: pd.DataFrame,
-         num_perm: int, two_way: bool = False) -> Tuple[pd.DataFrame, pd.DataFrame, List]:
+         num_perm: int, two_way: bool = False, _dir: Path=None) -> Tuple[pd.DataFrame, pd.DataFrame, List]:
     """
     Generate null distributions for line and specimen-level data
 
@@ -431,14 +434,19 @@ def null(input_data: pd.DataFrame,
 
     spec_df = pd.DataFrame.from_records(spec_p, columns=label_names)
 
-    line_df = null_line(wt_indx_combinations, baselines, num_perm, two_way=two_way)
+    pdist_results_file = _dir / "pdist_results.csv"
+
+
+
+
+    line_df = null_line(wt_indx_combinations, baselines, num_perm, two_way=two_way, pdist_file=pdist_results_file)
     #print(line_df['x3'])
     return strip_x([line_df, spec_df])
 
 
 def null_line(wt_indx_combinations: dict,
               data: pd.DataFrame,
-              num_perms=1000, two_way:bool=False) -> pd.DataFrame:
+              num_perms=1000, two_way:bool=False, pdist_file:Path=None) -> pd.DataFrame:
     """
     Generate pvalue null distributions for all labels in 'data'
     NaN values are excluded potentailly resultnig in different sets of specimens for each label. This makes it tricky to
@@ -483,8 +491,26 @@ def null_line(wt_indx_combinations: dict,
     cols = list(data.drop(['staging', 'genotype', 'treatment'], axis='columns').columns) if two_way else \
         list(data.drop(['staging', 'genotype'], axis='columns').columns)
 
-    # Run each label on a thread
-    if two_way:
+    load_pdists = pdist_file if os.path.exists(pdist_file) else None
+
+    if load_pdists:
+        # load pdists from separate parallel run
+        pdists = pd.read_csv(load_pdists)
+    elif any("__" in col for col in data.columns):
+        logging.info("Radiomics null distributions need to be run separately in parallel via mpi-run")
+        logging.info("Saving data to {}".format(pdist_file.parent))
+
+        data_file = pdist_file.parent / "data_for_null_calc.csv"
+        data.to_csv(data_file)
+        comb_file =  pdist_file.parent / "combs_for_null_calc.csv"
+        pd.DataFrame(wt_indx_combinations).to_csv(comb_file)
+        cols_file =  pdist_file.parent / "cols_for_null_calc.csv"
+        pd.DataFrame(cols).to_csv(cols_file)
+        sys.exit()
+
+        # will trigger for radiomics data
+    elif two_way:
+        # Run each label on a thread
         pdists = Parallel(n_jobs=-1)(delayed(_two_way_null_line_thread)
                                      (prepare(i), num_perms, wt_indx_combinations, i) for i in tqdm(cols))
     else:
@@ -568,7 +594,7 @@ def _two_way_null_line_thread(*args) -> List[float]:
     indxs = wt_indx_combinations[label]
 
     formula = f'{label} ~ genotype * treatment + staging'
-    for comb in indxs:
+    for i, comb in enumerate(indxs):
         # set up genotype and treatment
         data.loc[:, 'genotype'] = 'wt'
         data.loc[:,'treatment'] = 'veh'

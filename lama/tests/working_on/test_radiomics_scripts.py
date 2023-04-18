@@ -24,7 +24,7 @@ from lama.lama_radiomics import radiomics, rad_plotting
 
 import SimpleITK as sitk
 stats_cfg = Path(
-    "C:/Users/Kyle/PycharmProjects/LAMA/lama/tests/configs/permutation_stats/perm_no_qc.yaml")
+    "C:/LAMA/lama/tests/configs/permutation_stats/perm_no_qc.yaml")
 from lama.stats.permutation_stats.run_permutation_stats import get_radiomics_data
 
 
