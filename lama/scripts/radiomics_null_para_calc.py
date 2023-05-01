@@ -93,7 +93,7 @@ def main():
     #num_perms = ...  # specify the number of permutations
     wt_indx_combinations = pd.read_csv(str(_dir/"combs_for_null_calc.csv"), index_col=0)  # specify the WT index combinations
 
-    cols = data.columns.drop(['staging','genotype','staging'])
+    cols = data.columns.drop(['staging','genotype','treatment'])
 
     chunk_size = len(cols) // size
     start = rank * chunk_size

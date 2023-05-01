@@ -10,6 +10,8 @@ import matplotlib.pyplot as plt
 from logzero import logger as logging
 import numpy as np
 from tqdm import tqdm
+import fastcluster
+from scipy.spatial.distance import pdist
 
 def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_info_file: Path = None, rad_plot: bool = False):
     """
@@ -211,9 +213,19 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
 
             heat_df.dropna(how='all', inplace=True)
             heat_df.fillna(1, inplace=True)
-            heat_df.clip(upper=2, inplace=True)
 
-            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot):
+            # so in the radiomics stuff  - you get really large values, somehow they're negative!!
+            # TODO: figure that the hell out
+
+            heat_df.clip(upper=2, lower=0, inplace=True)
+
+            distances = pdist(heat_df)
+
+            Z = fastcluster.linkage(distances) if rad_plot else None
+
+            print(Z)
+
+            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, Z=Z):
                 logging.info(f'Skipping heatmap for {line} as there are no results')
 
             plt.tight_layout()
@@ -222,8 +234,10 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             plt.close()
 
 
+
+
             logging.info("Creating Additional z-normalised plots")
-            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True):
+            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True,Z=Z):
                 logging.info(f'Skipping heatmap for {line} as there are no results')
 
             plt.tight_layout()

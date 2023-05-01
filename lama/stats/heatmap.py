@@ -11,6 +11,7 @@ from typing import Union
 import matplotlib
 import scipy.spatial as sp, scipy.cluster.hierarchy as hc
 from scipy.stats import zscore
+import sys
 
 def heatmap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False):
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -62,9 +63,11 @@ def heatmap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False):
     return True
 
 
-def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False, z_norm: bool=False):
+def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False, z_norm: bool=False, Z=None):
 
-    font_size = 10 if rad_plot else 22
+    font_size = 5 if Z is not None else 10 if rad_plot else 22
+
+    sys.setrecursionlimit(10000)
 
     # use_sns = False
     if use_sns:
@@ -73,19 +76,39 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
             return
         try:
             if rad_plot:
-                cg = sns.clustermap(data,
-                                metric="euclidean",
-                                cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512, center="light",
-                                                           as_cmap=True),
-                                center=1,
-                                cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
-                                figsize=[30, len(data)*0.3])
+                # row linkage precomputed
+                if Z is not None:
+
+                    # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
+                    assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
+
+                    print(np.shape(data))
+
+                    cg = sns.clustermap(data,
+                                        metric="euclidean",
+                                        row_linkage=Z,
+                                        cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512, center="light",
+                                                                   as_cmap=True),
+                                        center=1,
+                                        cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                        figsize=[30, len(data) * 0.05])
+                else:
+                    cg = sns.clustermap(data,
+                                        metric="euclidean",
+                                        cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512, center="light",
+                                                                   as_cmap=True),
+                                        center=1,
+                                        cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                        figsize=[30, len(data) * 0.3])
+
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
 
                 cg.ax_heatmap.set_yticks(np.arange(len(ylabels)))
                 cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
                 cg.ax_heatmap.set_yticklabels(ylabels, fontsize=font_size, rotation=0)
+
+
             elif z_norm:
                 cg = sns.clustermap(data,
                                     z_score=0,
@@ -109,5 +132,6 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
             ...
 
+    sys.setrecursionlimit(1000)
 
     return True

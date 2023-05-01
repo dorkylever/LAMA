@@ -54,7 +54,8 @@ setup(
         'bottleneck',
         'cuda-python==11.8.1',
         'typing_extensions>=4.0.0',
-        'mpi4py'
+        'mpi4py',
+        'fastcluster'
     ],
     extras_require={
         'dev': ['h5py'],

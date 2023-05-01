@@ -20,6 +20,7 @@ from lama.scripts import lama_machine_learning
 import pacmap
 from lama.scripts import lama_permutation_stats
 from lama.lama_radiomics import radiomics, rad_plotting
+from lama.stats.penetrence_expressivity_plots import heatmaps_for_permutation_stats
 
 
 import SimpleITK as sitk
@@ -465,7 +466,7 @@ def test_BQ_mach_learn_non_tum():
 
 
 def test_BQ_mach_learn_batch_sp():
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/features")
+    _dir = Path("E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/features/")
 
     file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
@@ -558,7 +559,7 @@ def test_non_tum_feat_norm():
 
 def test_n_feat_plotting():
 
-    _dir = Path("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/test_size_0.2/None/")
+    _dir = Path("E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/test_size_0.2/None/")
 
     out_file = _dir / "full_cv_dataset.csv"
     cv_dataset = rad_plotting.n_feat_plotting(_dir)
@@ -572,6 +573,70 @@ def test_subsample_plotting():
     cv_dataset = rad_plotting.subsample_plotting(_dir)
     cv_dataset.to_csv(out_file)
 
+def test_secondary_dataset_confusion_matrix():
+    import catboost
+    from sklearn.metrics import confusion_matrix
+    from matplotlib.colors import ListedColormap
+
+    model = catboost.CatBoostClassifier()
+
+    model.load_model('E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/test_size_0.2/None/CPU_19_2.cbm')
+    X = pd.read_csv("E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/results_for_ml/validation.csv")
+    print(X)
+    logging.info("Tumour Time!")
+    X['Tumour_Model'] = X['Tumour_Model'].map({'4T1R': 0, 'CT26R': 1}).astype(int)
+    X.set_index('Tumour_Model', inplace=True)
+    X.drop(['Date', 'Animal_No.'], axis=1, inplace=True)
+    X = X.loc[:, ~X.columns.str.contains('shape')]
+    X.dropna(axis=1, inplace=True)
+
+
+    X = X.select_dtypes(include=np.number)
+
+    y_pred = model.predict(X)
+    print(X.index)
+    # Generate a confusion matrix
+    conf_matrix = confusion_matrix(X.index, y_pred)
+
+    cm = conf_matrix.astype('float') / conf_matrix.sum(axis=1)[:, np.newaxis]
+
+    # Print row-wise percentages
+
+
+    print(cm)
+    colors = [['red', 'white'], ['white', 'blue']]
+    conf_matrix_colors = np.empty(cm.shape, dtype='<U10')
+    for i in range(cm.shape[0]):
+        for j in range(cm.shape[1]):
+            conf_matrix_colors[i][j] = colors[i][j]
+
+    plt.imshow(cm, cmap='Blues', interpolation='None')
+    plt.imshow(cm, interpolation='nearest', alpha=.3)
+
+
+    # Add labels and ticks to the plot
+    tick_marks = np.arange(len(cm))
+    plt.xticks(tick_marks, ["Actual 4T1", "Actual CT26"])
+    plt.yticks(tick_marks, ["Pred 4T1", "Pred CT26"])
+    plt.xlabel('True label')
+    plt.ylabel('Predicted label')
+
+    # Add values to the plot
+    for i in range(len(cm)):
+        for j in range(len(cm)):
+            plt.text(j, i, cm[i][j],
+                     horizontalalignment="center",
+                     color="white" if cm[i][j] > cm.max() / 2. else "black")
+
+    # Save the plot as a PNG image
+    plt.savefig('E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/test_size_0.2/None/confusion_matrix.png')
+
+
+
+
+
+
+
 
 
 def test_feat_reduction():
@@ -579,7 +644,7 @@ def test_feat_reduction():
     feature_reduction.main()
 
 def test_mach_learn_pipeline():
-    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/")
+    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/results_for_ml")
 
 def test_mach_learn_pipeline_v2():
     lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/results_for_ml/")
@@ -696,6 +761,11 @@ def test_permutation_stats():
 
     """
     lama_permutation_stats.run(stats_cfg)
+def test_two_way_pene_plots():
+    _dir = Path("E:/221122_two_way/permutation_stats/rad_perm_all_feats/")
+    _label_dir = Path("E:/221122_two_way/target/E14_5_atlas_v24_43_label_info_v2.csv")
+    heatmaps_for_permutation_stats(root_dir=_dir, two_way=True, label_info_file=_label_dir, rad_plot=True)
+
 
 def test_sns_clustermap():
     url = "https://raw.githubusercontent.com/dorkylever/LAMA/master/lama/tests/clustermap_data.csv"

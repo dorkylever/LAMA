@@ -271,7 +271,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
     X.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
 
     logging.info("fitting model to training data")
-    m = CatBoostClassifier(iterations=1000, task_type='GPU', verbose=250, train_dir=org_dir)
+    m = CatBoostClassifier(iterations=1000, task_type='GPU', verbose=500, train_dir=org_dir)
     m.fit(X, X.index.to_numpy())
     logging.info("doing feature selection using SHAP")
 
@@ -288,7 +288,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         full_X = [X for X in full_X if X is not None]
         full_X = [X for X in full_X if (X.shape[1] > 0 & X.shape[1] < 200)]
     else:
-        n_feats = list(np.arange(1, 31, 1))
+        n_feats = list(np.arange(12, 25, 1))
         full_X = [shap_feat_select(X, shap_importance,rad_file_path.parent, n_feats=n, n_feat_cutoff=n, org=org) for n in n_feats]
 
 

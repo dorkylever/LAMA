@@ -495,7 +495,11 @@ def null_line(wt_indx_combinations: dict,
 
     if load_pdists:
         # load pdists from separate parallel run
-        pdists = pd.read_csv(load_pdists)
+        pdists = pd.read_csv(load_pdists, index_col=0)
+        # so pdists reads elements of arrays as strings so you have to do the following conversion:
+
+        pdists = pdists.applymap(lambda x: np.fromstring(x.strip('[]'), sep=' '))
+        
     elif any("__" in col for col in data.columns):
         logging.info("Radiomics null distributions need to be run separately in parallel via mpi-run")
         logging.info("Saving data to {}".format(pdist_file.parent))
