@@ -158,10 +158,10 @@ def generate_random_combinations(data: pd.DataFrame, num_perms):
 
 def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
     logger.info('generating permutations')
-    print("data columns", data.columns)
+
     data = data.drop(columns='staging', errors='ignore')
     line_specimen_counts = get_line_specimen_counts(data, two_way=True)
-    print(line_specimen_counts)
+
     n_groups = get_two_way_n_groups(data)
 
     result = {}
@@ -337,7 +337,7 @@ def null(input_data: pd.DataFrame,
 
     # Create synthetic specimens by iteratively relabelling each baseline as synthetic mutant
     baselines = input_data[input_data['line'] == 'baseline']
-    print(baselines)
+
     # Get the line specimen n numbers. Keep the first column
     # line_specimen_counts = get_line_specimen_counts(input_data)
     # Pregenerate all the combinations
