@@ -137,7 +137,7 @@ def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Pa
 
     # horizontal merge - hope it works
     data = pd.concat(df_list, axis=1)
-    data = data.loc[:, data.columns.str.contains('shape')]
+    #data = data.loc[:, data.columns.str.contains('shape')]
     data = data.loc[:, ~data.columns.str.contains('2D')]
     #whiskers has no baselines in our data
     data = data.loc[:, ~data.columns.str.contains('27')]
