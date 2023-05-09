@@ -106,7 +106,6 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
 
     for spec_file in specimen_hits:
         d = pd.read_csv(spec_file, index_col=0)
-        print("d", d)
         dfs[spec_file.name] = d
 
     # get the superset of all hit labels
@@ -136,7 +135,6 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             hit_lables.update(x[x[col] == True].index.values)
 
 
-
     # For each hit table, keep only those in the hit superset and create heat_df
     t = []
     for line_or_spec, y in tqdm(dfs.items()):
@@ -154,7 +152,6 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
         elif 'label_name' in y:
             y = y[y['label_name'].isin(hit_lables)]
             y.set_index('label_name', inplace=True, drop=True)
-            print("y", y)
         else:
             y.index = y.index.astype(str)
 
@@ -193,13 +190,17 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
     sorted_ids = [line_id] + ids
     heat_df = heat_df[sorted_ids]
 
+
+
     if rad_plot:
         heat_df.columns = [col.rsplit('_', 3)[0] for col in heat_df.columns]
+
 
     try:
         if two_way:
             if not rad_plot:
                 heat_df.columns = [x.split("org")[0] for x in heat_df.columns]
+
 
             if not heatmap(heat_df, title=title, use_sns=True, rad_plot=rad_plot):
                 logging.info(f'Skipping heatmap for {line} as there are no results')
@@ -215,15 +216,20 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             heat_df.fillna(1, inplace=True)
 
             # so in the radiomics stuff  - you get really large values, somehow they're negative!!
-            # TODO: figure that the hell out
+            # TODO: figure that the hell out why I'm getting negative values
 
             heat_df.clip(upper=2, lower=0, inplace=True)
 
+            print(heat_df)
+            try:
+                print(heat_df.loc['original shape VoxelVolume brain lateral ventricle'])
+                print(heat_df.loc['original shape MinorAxisLength brain lateral ventricle'])
+            except KeyError:
+                print("No row")
             distances = pdist(heat_df)
 
             Z = fastcluster.linkage(distances) if rad_plot else None
 
-            print(Z)
 
             if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, Z=Z):
                 logging.info(f'Skipping heatmap for {line} as there are no results')
@@ -232,8 +238,6 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
 
             plt.savefig(outdir / f"{line}_organ_hit_clustermap.png")
             plt.close()
-
-
 
 
             logging.info("Creating Additional z-normalised plots")
@@ -245,6 +249,34 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             plt.savefig(outdir / f"{line}_organ_hit_clustermap_z_normed.png")
             plt.close()
 
+            logging.info("creating heatmaps per organ")
+
+            # split the dataset by organ:
+            split_datasets = {}
+            for i, idx in enumerate(heat_df.index):
+                # ignore the type of radiomic measruemetn and get the organ, wavelet has an extra space
+                split_on = ' '.join(idx.split(' ')[4:]) if 'wavelet' in idx else ' '.join(idx.split(' ')[3:])
+                if split_on not in split_datasets:
+                    split_datasets[split_on] = pd.DataFrame(columns=heat_df.columns)
+
+                    # add the row to the split dataset
+                split_datasets[split_on] = split_datasets[split_on].append(heat_df.loc[idx])
+
+
+            for key, df in split_datasets.items():
+                title = f"Clustermap for {key}"
+                filename = f"{line}_{key}_organ_hit_clustermap.png"
+                if key == "brain lateral ventricle":
+                    try:
+                        print("final in pene_plots: ", df.loc['original shape VoxelVolume brain lateral ventricle'])
+                        print("final in pene_plots: ", df.loc['original shape MinorAxisLength brain lateral ventricle'])
+                    except KeyError:
+                        print("No row")
+                if not clustermap(df, title=title, use_sns=True, rad_plot=rad_plot):
+                    logging.info(f'Skipping heatmap for {line} as there are no results')
+                plt.tight_layout()
+                plt.savefig(outdir / filename)
+                plt.close()
 
         else:
             if not heatmap(heat_df, title=title, use_sns=True):

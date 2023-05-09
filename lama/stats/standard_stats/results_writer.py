@@ -75,9 +75,7 @@ class ResultsWriter:
         line_tstats = results.line_tstats
         line_qvals = results.line_qvals
         line_pvals = results.line_pvalues # Need to get thse into organ volumes
-        print("line pvals: ", np.shape(line_pvals), line_pvals)
 
-        print("line qvals: ", np.shape(line_qvals), line_qvals)
         logging.info('Writing line-level results...')
         
         line_threshold_file = self.out_dir / f'Qvals_{stats_name}_{self.line}.csv'

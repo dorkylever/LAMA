@@ -76,13 +76,19 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
             return
         try:
             if rad_plot:
+
+                try:
+                    print("final before clustermap: ", data.loc['original shape VoxelVolume brain lateral ventricle'])
+                except KeyError:
+                    print("No row")
+
+                print("Z:", Z)
                 # row linkage precomputed
                 if Z is not None:
 
                     # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
                     assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
 
-                    print(np.shape(data))
 
                     cg = sns.clustermap(data,
                                         metric="euclidean",
@@ -93,6 +99,9 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
                                         figsize=[30, len(data) * 0.05])
                 else:
+
+                    # So I have no fucking clue why this needs to be inverted when the raw values are fine and the clustmerap is fine
+                    # man seaborn is fucking stupid
                     cg = sns.clustermap(data,
                                         metric="euclidean",
                                         cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512, center="light",
@@ -101,13 +110,14 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
                                         figsize=[30, len(data) * 0.3])
 
-
                 ylabels = [x.replace('_', ' ') for x in data.index]
+                reordered_ind = cg.dendrogram_row.reordered_ind
+                ylabels = [ylabels[i] for i in reordered_ind]
 
+                #ylabels = [x.replace('_', ' ') for x in data.index]
                 cg.ax_heatmap.set_yticks(np.arange(len(ylabels)))
                 cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
                 cg.ax_heatmap.set_yticklabels(ylabels, fontsize=font_size, rotation=0)
-
 
             elif z_norm:
                 cg = sns.clustermap(data,

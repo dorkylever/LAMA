@@ -102,7 +102,7 @@ def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Pa
 
     # get the features_per_embryo and convert it into per organs
     feature_dir = rad_dir / "features"
-    #common.gather_rad_data(feature_dir)
+    common.gather_rad_data(feature_dir)
 
     org_dir = rad_dir / "organs"
 
