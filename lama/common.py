@@ -810,21 +810,62 @@ def csv_read_dict(path):
     return lines
 
 
-def gather_rad_data(_dir):
+def get_file_names(directory, extension):
+    """Helper function to get file names from a directory."""
+    return [p.stem for p in directory.glob(f'*.{extension}')]
+
+def gather_rad_data(_dir, check_files: bool=False):
+
     file_names = [spec for spec in get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
     data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
     abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
-    for i, df in enumerate(data):
-        df.index.name = 'org'
-        df.name = str(file_names[i]).split(".")[0].split("/")[-1]
-        df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
-        df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i])) | ('BL6' in str(file_names[i]))) else \
-            'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
-        df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
-    data = pd.concat(data,
-                     ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
-                     names=['specimen', 'org'])
+    if check_files:
+        # for Gina: get the file names for each condition, then assign the genotype and treatment based on the cond
+
+        # don't need to read in baselines
+        #baseline_directory = _dir.parent.parent / "baseline" / "inputs" / "baseline"
+        #baseline_file_names = get_file_names(baseline_directory, 'nrrd')
+
+        mutants_directory = _dir.parent.parent / "mutants" / "inputs" / "mutants"
+        mutants_file_names = get_file_names(mutants_directory, 'nrrd')
+
+        treatment_directory = _dir.parent.parent / "treatment" / "inputs" / "treatment"
+        treatment_file_names = get_file_names(treatment_directory, 'nrrd')
+
+        mut_treat_directory = _dir.parent.parent / "mut_treat" / "inputs" / "mut_treat"
+        mut_treat_file_names = get_file_names(mut_treat_directory, 'nrrd')
+
+        # assing genotype and treatment values
+        for i, df in enumerate(data):
+            df.index.name = 'org'
+
+            df.name = str(file_names[i]).split(".")[0].split("/")[-1] #splits to get the file name
+            genotype = 'HOM' if any(substr in df.name for substr in mutants_file_names) or \
+                               any(substr in df.name for substr in mut_treat_file_names) else 'WT'
+
+            treatment = 'TREAT' if any(substr in df.name for substr in treatment_file_names) or \
+                                 any(substr in df.name for substr in mut_treat_file_names) else 'VEH'
+
+            df['genotype'] = genotype
+            df['treatment'] = treatment
+
+        data = pd.concat(data,
+                         ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
+                         names=['specimen', 'org'])
+
+    else:
+        for i, df in enumerate(data):
+            df.index.name = 'org'
+            df.name = str(file_names[i]).split(".")[0].split("/")[-1]
+            df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
+            df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i])) | ('BL6' in str(file_names[i]))) else \
+                'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
+            df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
+        data = pd.concat(data,
+                         ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
+                         names=['specimen', 'org'])
+
 
     line_file = _dir.parent / "full_results.csv"
     org_dir = _dir.parent / "organs"

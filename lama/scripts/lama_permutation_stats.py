@@ -32,7 +32,8 @@ allowed_cfg_keys = [
     'voxel_size',
     'two_way',
     'rad_dir',
-    'spec_fdr'
+    'spec_fdr',
+    'check_files'
 ]
 
 
@@ -90,6 +91,8 @@ def run(cfg_path):
     inter_dir = p(cfg['interaction_dir'])
     two_way = bool(cfg.get('two_way', False))
 
+    check_files = bool(cfg.get('check_files', False))
+
     spec_fdr = float(cfg.get('spec_fdr', 0.2))
 
     rad_dir = p(cfg.get('rad_dir'))
@@ -105,7 +108,8 @@ def run(cfg_path):
                               two_way=two_way,
                               treat_dir=treat_dir,
                               inter_dir=inter_dir,
-                              rad_dir=rad_dir
+                              rad_dir=rad_dir,
+                              check_files=check_files
     )
 
 

@@ -86,7 +86,7 @@ def test_permutation_stats_just_ovs():
     some hits
 
     """
-    lama_permutation_stats.run(stats_cfg_v2)
+    lama_permutation_stats.run(stats_cfg)
 
 
 

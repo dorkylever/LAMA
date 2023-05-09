@@ -82,7 +82,7 @@ def write_specimen_info(wt_wev, mut_wev, outfile):
     mut_wev.to_csv(outfile)
 
 
-def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Path, inter_dir: Path) -> pd.DataFrame:
+def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Path, inter_dir: Path, check_files: bool=False) -> pd.DataFrame:
     """
     Given a root registration directory, collate all the organ volume CSVs into one file.
     Write out the combined organ volume CSV into the root registration directory.
@@ -101,8 +101,9 @@ def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Pa
 
 
     # get the features_per_embryo and convert it into per organs
+
     feature_dir = rad_dir / "features"
-    common.gather_rad_data(feature_dir)
+    common.gather_rad_data(feature_dir, check_files)
 
     org_dir = rad_dir / "organs"
 
@@ -122,7 +123,10 @@ def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Pa
 
         # For some reason,  "." stuffs up the pipeline and adds a space, just remove it
         org = str(d.org[0]).replace(".0","")
-        d.drop(columns=['HPE', 'genotype', 'background', 'org'], inplace=True)
+        if check_files:
+            d.drop(columns=['genotype', 'treatment', 'org'], inplace=True)
+        else:
+            d.drop(columns=['HPE', 'genotype', 'background', 'org'], inplace=True)
 
         # patsy has a fit with "-" thinks I'm subtracting
         # I use '__' as a method to identifiy radiomics data
@@ -133,8 +137,10 @@ def get_radiomics_data(rad_dir: Path, wt_dir: Path, mut_dir: Path, treat_dir: Pa
 
     # horizontal merge - hope it works
     data = pd.concat(df_list, axis=1)
-    #data = data.loc[:, data.columns.str.contains('shape')]
+    data = data.loc[:, data.columns.str.contains('shape')]
     data = data.loc[:, ~data.columns.str.contains('2D')]
+    #whiskers has no baselines in our data
+    data = data.loc[:, ~data.columns.str.contains('27')]
     data = pd.concat([data, staging], axis=1)
     return data
 
@@ -674,7 +680,8 @@ def run(wt_dir: Path,
         two_way: bool = False,
         treat_dir: Path = None,
         inter_dir: Path = None,
-        rad_dir: Path = None):
+        rad_dir: Path = None,
+        check_files: bool=False):
     """
     Run the permutation-based stats pipeline
 
@@ -728,7 +735,7 @@ def run(wt_dir: Path,
         wt_staging = get_staging_data(wt_dir)
         mut_staging = get_staging_data(mut_dir)
         logging.info('Collecting Radiomics data')
-        data = get_radiomics_data(rad_dir, wt_dir, mut_dir, treat_dir, inter_dir)
+        data = get_radiomics_data(rad_dir, wt_dir, mut_dir, treat_dir, inter_dir, check_files)
         # turn on textures at your own risk
         data.to_csv(out_dir / 'radiomics_data.csv')
 

@@ -158,16 +158,17 @@ def generate_random_combinations(data: pd.DataFrame, num_perms):
 
 def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
     logger.info('generating permutations')
+    print("data columns", data.columns)
     data = data.drop(columns='staging', errors='ignore')
     line_specimen_counts = get_line_specimen_counts(data, two_way=True)
-
+    print(line_specimen_counts)
     n_groups = get_two_way_n_groups(data)
 
     result = {}
     # now for each label calculate number of combinations we need for each
     for label in tqdm(line_specimen_counts, total=line_specimen_counts.shape[0]):
         label_indices_result = []
-
+        print("label: ", label)
         counts = line_specimen_counts[label].value_counts()
 
         number_of_lines = counts[counts.index != 0].sum()  # Drop the lines with zero labels (have been qc'd out)
@@ -187,16 +188,17 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
         for n, n_combs_to_try in num_combs.items():
             n_combs_to_try = math.ceil(n_combs_to_try)
             max_combs = two_way_max_combinations(n, n_groups)
-            # logger.info(f'max_combinations for n={n} and wt_n={len(label_data)} = {max_combs}')
+            #logger.info(f'max_combinations for n={n} and wt_n={len(label_data)} = {max_combs}')
             records.append([n, n_combs_to_try, max_combs])
         df = pd.DataFrame.from_records(records, columns=['n', 'num_combs', 'max_combs'], index='n').sort_index(
             ascending=True)
+        print(df)
 
         # test whether it's possible to have this number of permutations with data structure
         # so for the two-way this wont change
         #print(f'Max combinations for label {label} is {max_combs}')
         if float(num_perms) > float(df.max_combs.sum()):
-            raise ValueError(f'Max number of combinations is {max_combs}, you requested {num_perms}')
+            raise ValueError(f'Max number of combinations is {df.max_combs.sum()}, you requested {num_perms}')
 
 
         indx = label_data.index
@@ -335,7 +337,7 @@ def null(input_data: pd.DataFrame,
 
     # Create synthetic specimens by iteratively relabelling each baseline as synthetic mutant
     baselines = input_data[input_data['line'] == 'baseline']
-
+    print(baselines)
     # Get the line specimen n numbers. Keep the first column
     # line_specimen_counts = get_line_specimen_counts(input_data)
     # Pregenerate all the combinations
