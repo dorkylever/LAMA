@@ -2,7 +2,7 @@
 from pathlib import Path
 
 import joblib
-
+from lama.stats.heatmap import heatmap, clustermap
 from lama.lama_radiomics.radiomics import radiomics_job_runner
 from lama import common
 import os
@@ -20,7 +20,7 @@ from lama.scripts import lama_machine_learning
 import pacmap
 from lama.scripts import lama_permutation_stats
 from lama.lama_radiomics import radiomics, rad_plotting
-from lama.stats.penetrence_expressivity_plots import heatmaps_for_permutation_stats
+from lama.stats.penetrence_expressivity_plots import heatmaps_for_permutation_stats, filt_for_shared_feats
 
 
 import SimpleITK as sitk
@@ -635,6 +635,26 @@ def test_secondary_dataset_confusion_matrix():
 
 
 
+def test_find_shared_feats():
+
+    target_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/inter_organ_hit_dataset.csv", index_col=0)
+    test_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/inter_organ_hit_dataset.csv", index_col=0)
+    results = filt_for_shared_feats(target_dataset, test_dataset)
+
+    outdir = Path("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/")
+
+
+    for num_rows, df in results.items():
+
+        df.clip(upper=2, lower=0, inplace=True)
+        df = df.transpose()
+        if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
+            logging.info(f'Skipping heatmap for {num_rows} as there are no results')
+
+        plt.tight_layout()
+
+        plt.savefig(outdir / f"inter_rows{num_rows}_organ_hit_clustermap.png")
+        plt.close()
 
 
 
@@ -647,7 +667,7 @@ def test_mach_learn_pipeline():
     lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/results_for_ml")
 
 def test_mach_learn_pipeline_v2():
-    lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/sphere_5_res/results_for_ml/")
+    lama_machine_learning.ml_job_runner("E:/221122_two_way/g_by_back_data/radiomics_output_for_text/organs/")
 
 def test_mach_learn_pipeline_v3():
     lama_machine_learning.ml_job_runner("E:/220204_BQ_dataset/scans_for_sphere_creation/fold_normed_res/results_for_ml/")
@@ -761,6 +781,8 @@ def test_permutation_stats():
 
     """
     lama_permutation_stats.run(stats_cfg)
+
+
 def test_two_way_pene_plots():
     _dir = Path("E:/221122_two_way/permutation_stats/rad_perm_all_feats/")
     _label_dir = Path("E:/221122_two_way/target/E14_5_atlas_v24_43_label_info_v2.csv")

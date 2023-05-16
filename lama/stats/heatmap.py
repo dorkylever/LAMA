@@ -68,27 +68,28 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
     font_size = 5 if Z is not None else 10 if rad_plot else 22
 
     sys.setrecursionlimit(10000)
-
+    print(data)
     # use_sns = False
     if use_sns:
+        print(data.isnull())
+
         # sns.palplot(sns.color_palette("coolwarm"))
         if data.isnull().values.all():
             return
         try:
             if rad_plot:
-
                 try:
                     print("final before clustermap: ", data.loc['original shape VoxelVolume brain lateral ventricle'])
                 except KeyError:
                     print("No row")
-
-                print("Z:", Z)
                 # row linkage precomputed
                 if Z is not None:
 
                     # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
                     assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
 
+                    figheight = len(data) * 0.05
+                    figheight = figheight if figheight*100 < 65536 else 655
 
                     cg = sns.clustermap(data,
                                         metric="euclidean",
@@ -97,18 +98,22 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
-                                        figsize=[30, len(data) * 0.05])
+                                        figsize=[30, figheight])
                 else:
 
                     # So I have no fucking clue why this needs to be inverted when the raw values are fine and the clustmerap is fine
                     # man seaborn is fucking stupid
+                    figheight = len(data) * 0.3
+
+                    figheight = figheight if figheight*100 < 65536 else 655
+
                     cg = sns.clustermap(data,
                                         metric="euclidean",
                                         cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512, center="light",
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
-                                        figsize=[30, len(data) * 0.3])
+                                        figsize=[30, figheight])
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
                 reordered_ind = cg.dendrogram_row.reordered_ind

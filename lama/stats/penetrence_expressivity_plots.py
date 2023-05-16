@@ -13,6 +13,63 @@ from tqdm import tqdm
 import fastcluster
 from scipy.spatial.distance import pdist
 
+
+
+
+
+def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFrame):
+    # transpose so specimens are rows
+    target_dataset = target_dataset.transpose()
+    test_dataset = test_dataset.transpose()
+
+    abnormal_embs = ['22300_e8','22300_e6', '50_e5']
+
+    # add abnormal embryos tags:
+    for i, df in enumerate([target_dataset, test_dataset]):
+        def label_hpe(row):
+            row_name = row.name
+
+            if any(substring in row_name for substring in abnormal_embs):
+                return 'abnormal'
+            else:
+                return 'normal'
+
+        df['HPE'] = df.apply(label_hpe, axis=1)
+
+
+
+    target_dataset = target_dataset[target_dataset['HPE'] == 'abnormal']
+    # this is just so I can do BL6_hets
+
+    test_dataset = test_dataset[test_dataset['HPE'] != 'abnormal']
+
+    filtered_data = {}
+    max_rows = target_dataset.shape[0]
+
+    for num_rows in range(max_rows, 0, -1):
+
+        row_counts = target_dataset.apply(lambda x: x.ne(1).sum(), axis=0)
+        num_pos = target_dataset.apply(lambda x: (pd.to_numeric(x, errors='coerce') > 1).sum(), axis=0)
+        num_neg =target_dataset.apply(lambda x: (pd.to_numeric(x, errors='coerce') < 1).sum(), axis=0)
+
+        print("row counts", row_counts)
+        print("num pos", num_pos)
+        filtered_columns = target_dataset.columns[(row_counts >= num_rows)&((num_pos>=num_rows)|(num_neg>=num_rows))]
+
+        filtered_columns = [col for col in filtered_columns if col in test_dataset.columns]
+        filtered_data[num_rows] = test_dataset[filtered_columns]
+
+    results = {}
+
+    for num_rows, df in filtered_data.items():
+        #feats_of_int = df.columns[(df != 1).any()]
+        feats_of_int = df.columns
+
+        results[num_rows] = pd.concat([df[feats_of_int], target_dataset[feats_of_int]], axis=0)
+
+    return results
+
+
 def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_info_file: Path = None, rad_plot: bool = False):
     """
     This function works on the output of the premutation stats. For the non-permutation, may need to make a different
@@ -210,22 +267,21 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             plt.savefig(outdir / f"{line}_organ_hit_heatmap.png")
             plt.close()
 
+
             #sns.clustermap needs non-nan values to calculate distances
 
             heat_df.dropna(how='all', inplace=True)
             heat_df.fillna(1, inplace=True)
 
+
+
+            heat_df.to_csv(str(outdir / f"{line}_organ_hit_dataset.csv"))
+
             # so in the radiomics stuff  - you get really large values, somehow they're negative!!
             # TODO: figure that the hell out why I'm getting negative values
-
             heat_df.clip(upper=2, lower=0, inplace=True)
 
-            print(heat_df)
-            try:
-                print(heat_df.loc['original shape VoxelVolume brain lateral ventricle'])
-                print(heat_df.loc['original shape MinorAxisLength brain lateral ventricle'])
-            except KeyError:
-                print("No row")
+
             distances = pdist(heat_df)
 
             Z = fastcluster.linkage(distances) if rad_plot else None

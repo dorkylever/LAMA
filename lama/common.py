@@ -819,7 +819,8 @@ def gather_rad_data(_dir, check_files: bool=False):
     file_names = [spec for spec in get_file_paths(folder=_dir, extension_tuple=".csv")]
     file_names.sort()
     data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
-    abnormal_embs = ['22300_e8', '22300_e6', '50_e5']
+    alobar_embs = ['22300_e8', '50_e5']
+    semilobar_embs = ['22300_e6']
     if check_files:
         # for Gina: get the file names for each condition, then assign the genotype and treatment based on the cond
 
@@ -861,7 +862,8 @@ def gather_rad_data(_dir, check_files: bool=False):
             df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
             df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i])) | ('BL6' in str(file_names[i]))) else \
                 'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
-            df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
+            df['HPE'] = 'alobar' if any(map(str(file_names[i]).__contains__,
+                                            alobar_embs)) else 'semilobar' if any(map(str(file_names[i]).__contains__, semilobar_embs)) else 'normal'
         data = pd.concat(data,
                          ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
                          names=['specimen', 'org'])
