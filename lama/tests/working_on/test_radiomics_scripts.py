@@ -637,24 +637,106 @@ def test_secondary_dataset_confusion_matrix():
 
 def test_find_shared_feats():
 
-    target_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/inter_organ_hit_dataset.csv", index_col=0)
-    test_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/inter_organ_hit_dataset.csv", index_col=0)
-    results = filt_for_shared_feats(target_dataset, test_dataset)
+    inter_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/inter_organ_hit_dataset.csv", index_col=0)
+    geno_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/geno_organ_hit_dataset.csv", index_col=0)
+    treat_dataset = pd.read_csv("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/treat_organ_hit_dataset.csv", index_col=0)
 
     outdir = Path("E:/221122_two_way/permutation_stats/rad_perm_all_feats/two_way/")
 
+    results_dict = {}
 
-    for num_rows, df in results.items():
+    input_dict = {"inter":inter_dataset, "geno": geno_dataset, "treat": treat_dataset}
 
-        df.clip(upper=2, lower=0, inplace=True)
-        df = df.transpose()
-        if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
-            logging.info(f'Skipping heatmap for {num_rows} as there are no results')
 
-        plt.tight_layout()
+    for key, dset in input_dict.items():
 
-        plt.savefig(outdir / f"inter_rows{num_rows}_organ_hit_clustermap.png")
-        plt.close()
+        results = filt_for_shared_feats(inter_dataset, dset)
+
+        results_dict[key] = pd.concat(list(results.values()), axis=1)
+
+        for num_rows, df in results.items():
+
+            df.clip(upper=2, lower=0, inplace=True)
+            df = df.transpose()
+            if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
+                logging.info(f'Skipping heatmap for {num_rows} as there are no results')
+
+            plt.tight_layout()
+
+            plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
+            plt.close()
+
+
+
+    inters = results_dict.get("inter")
+    print("inters", inters)
+
+
+    genos = results_dict.get("geno")
+    genos = genos.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
+
+    print("genos", genos)
+    treats = results_dict.get("treat")
+
+    treats = treats.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
+
+    print("treats", treats)
+
+    #assert list(inters.columns) == list(genos.columns) == list(treats.columns), "Column names are not identical"
+
+    assert not inters.index.isin(
+        genos.index).any(), "Some index values are duplicated between 'inters' and 'genos' DataFrames."
+    assert not inters.index.isin(
+        treats.index).any(), "Some index values are duplicated between 'inters' and 'treats' DataFrames."
+    assert not genos.index.isin(
+        treats.index).any(), "Some index values are duplicated between 'genos' and 'treats' DataFrames."
+
+    # Step 1: Find shared columns
+    shared_columns = set(genos.columns).intersection(treats.columns).intersection(inters.columns)
+
+    genos = genos[shared_columns]
+    treats = treats[shared_columns]
+    unique_feats_HPE = inters.loc[:, ~inters.columns.isin(shared_columns)].transpose()
+
+    inters = inters[shared_columns]
+
+    # Step 2: Perform row-wise merge
+    full_dataset = pd.concat([inters, genos, treats], axis=0)
+
+    full_dataset.to_csv(str(outdir/"full_datasets_heatmap.csv"))
+
+    full_dataset.fillna(1, inplace=True)
+
+    full_dataset.clip(upper=2, lower=0, inplace=True)
+    full_dataset = full_dataset.transpose()
+
+
+    if not clustermap(full_dataset, title="Hooly", use_sns=True, rad_plot=True):
+        logging.info('Skipping heatmap for as there are no results')
+
+    plt.tight_layout()
+    plt.savefig(outdir / "combined_organ_hit_clustermap_good.png")
+    plt.close()
+
+    if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
+        logging.info('Skipping heatmap for as there are no results')
+
+    plt.tight_layout()
+    plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
+    plt.close()
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 

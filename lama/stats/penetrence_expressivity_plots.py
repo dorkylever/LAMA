@@ -46,17 +46,15 @@ def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFra
     filtered_data = {}
     max_rows = target_dataset.shape[0]
 
-    for num_rows in range(max_rows, 0, -1):
-
+    for num_rows in range(max_rows, 1, -1):
         row_counts = target_dataset.apply(lambda x: x.ne(1).sum(), axis=0)
         num_pos = target_dataset.apply(lambda x: (pd.to_numeric(x, errors='coerce') > 1).sum(), axis=0)
         num_neg =target_dataset.apply(lambda x: (pd.to_numeric(x, errors='coerce') < 1).sum(), axis=0)
 
-        print("row counts", row_counts)
-        print("num pos", num_pos)
         filtered_columns = target_dataset.columns[(row_counts >= num_rows)&((num_pos>=num_rows)|(num_neg>=num_rows))]
 
         filtered_columns = [col for col in filtered_columns if col in test_dataset.columns]
+
         filtered_data[num_rows] = test_dataset[filtered_columns]
 
     results = {}

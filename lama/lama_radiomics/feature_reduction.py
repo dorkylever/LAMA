@@ -1,6 +1,6 @@
 from logzero import logger as logging
 import os
-from catboost import CatBoostClassifier, Pool, sum_models, cv
+from catboost import CatBoostClassifier, Pool, sum_models, cv, CatBoostRegressor
 import matplotlib.pyplot as plt
 # import time
 import shap
@@ -18,7 +18,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split, GridSearchCV
 # from sklearn.metrics import accuracy_score, roc_auc_score, precision_score, f1_score, recall_score, matthews_corrcoef, make_scorer
 from sklearn.pipeline import Pipeline
-from imblearn.over_sampling import SMOTE
+from imblearn.over_sampling import SMOTE, ADASYN
 from imblearn.under_sampling import OneSidedSelection
 from imblearn.pipeline import Pipeline
 # import statistics
@@ -26,6 +26,7 @@ import seaborn as sns
 from collections import Counter
 
 from sklearn.model_selection import KFold
+
 
 
 
@@ -118,6 +119,32 @@ def shap_feature_ranking(data, shap_values, columns=[]):
     df_ranking.index += 1
     return df_ranking
 
+def shap_feature_ranking_v2(data, shap_values, columns=[]):
+    """
+    From stack-overflow, return columns
+    """
+    if not columns:
+        columns = data.columns.tolist()  # If columns are not given, take all columns
+
+    if shap_values.ndim == 3:
+        n_samples, n_instances, n_features = shap_values.shape
+        shap_values_2d = shap_values.reshape(n_samples * n_instances, n_features)
+    elif shap_values.ndim == 2:
+        shap_values_2d = shap_values
+    else:
+        raise ValueError("Expected 2D or 3D shap_values array.")
+
+    c_idxs = [data.columns.get_loc(column) for column in columns]  # Get column locations for desired columns in given dataframe
+
+    means = np.abs(shap_values_2d[:, c_idxs]).mean(axis=0)  # Compute mean shap values over all samples and instances
+
+    # Put into dataframe along with columns and sort by shap_means, reset index to get ranking
+    df_ranking = pd.DataFrame({'feature': columns, 'mean_shap_value': means}).sort_values(by='mean_shap_value',
+                                                                                          ascending=False).reset_index(
+        drop=True)
+    df_ranking.index += 1
+    return df_ranking
+
 
 def shap_feat_select(X, shap_importance, _dir, n_feats: list, cut_off: float = -1, n_feat_cutoff: float = None, org: int = None):
     """
@@ -164,8 +191,16 @@ def shap_feat_select(X, shap_importance, _dir, n_feats: list, cut_off: float = -
 
 def smote_oversampling(X, k: int = 6, max_non_targets: int = 300):
     # gets the ratio of target to baseline
-    non_targets = Counter(X.index)[0]
-    targets = Counter(X.index)[1]
+
+    if X.index.isna().any():
+        print("Index contains NaN values")
+    else:
+        print("Index does not contain NaN values")
+
+    non_targets = Counter(X.index)[np.min(X.index)]
+
+    targets = sum(Counter(X.index[X.index > np.min(X.index)]).values())
+
     obs_ratio = targets / non_targets
     logging.info("Original ratio of targets : non-targets = {}".format(obs_ratio))
     if (non_targets > max_non_targets) & (obs_ratio < 0.2):
@@ -180,6 +215,7 @@ def smote_oversampling(X, k: int = 6, max_non_targets: int = 300):
         x_train_std_os = X
         y_train_os = X.index
     else:
+        print(len(Counter(X.index)))
         sm = SMOTE(n_jobs=-1, k_neighbors=k - 1)
         x_train_std_os, y_train_os = sm.fit_resample(X, X.index)
 
@@ -205,8 +241,10 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
         #X.set_index('condition', inplace=True)
 
-        X['HPE'] = X['HPE'].map({'normal': 0, 'abnormal': 1}).astype(int)
+        X['HPE'] = X['HPE'].map({'normal': 0, 'semilobar': 0.7, 'alobar': 1}).astype(float)
         X.set_index('HPE', inplace=True)
+        print(X)
+        #X.dropna(axis=1, inplace=True)
         #X = X[X['background'] == 'C3HHEH']
         #X['genotype'] = X['genotype'].map({'WT': 0, 'HET': 1}).astype(int)
         #X.set_index('genotype', inplace=True)
@@ -240,6 +278,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
     X = X.select_dtypes(include=np.number)
 
+    print(X)
 
     #do the same stuff for the complete dataset
 
@@ -262,27 +301,30 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
 
     # balancing clsses via SMOTE
-    logging.info("oversampling via smote")
+
 
     n_test = X[X.index == 1].shape[0]
 
-    X = smote_oversampling(X, n_test) if n_test < 5 else smote_oversampling(X)
+    if len(Counter(X.index))==2:
+        logging.info("oversampling via smote")
+        X = smote_oversampling(X, n_test) if n_test < 5 else smote_oversampling(X)
 
-    X.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
+    #X.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
 
     logging.info("fitting model to training data")
-    m = CatBoostClassifier(iterations=1000, task_type='GPU', verbose=500, train_dir=org_dir)
+    m = CatBoostClassifier(iterations=1000, task_type='CPU', verbose=500, train_dir=org_dir) if len(Counter(X.index))==2 else CatBoostRegressor(iterations=1000, task_type='CPU', verbose=500, train_dir=org_dir)
     m.fit(X, X.index.to_numpy())
     logging.info("doing feature selection using SHAP")
 
     shap_values = m.get_feature_importance(Pool(X, X.index.to_numpy()), type='ShapValues', )[:, :-1]
-
+    print(np.shape(shap_values))
+    print(shap_values)
     shap_importance = shap_feature_ranking(X, shap_values)
 
 
     if org:
         n_feats = []
-        shap_cut_offs = list(np.arange(0.000, 2.5, 0.025))
+        shap_cut_offs = list(np.arange(0.000, 2.5, 0.005))
         full_X = [shap_feat_select(X, shap_importance,rad_file_path.parent, n_feats=n_feats, cut_off=cut_off, org=org) for cut_off in
                   shap_cut_offs]
         full_X = [X for X in full_X if X is not None]
@@ -323,13 +365,21 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         all_x = Pool(data=x, label=x.index.to_numpy())
 
         # create a CPU or GPU model
-        m = CatBoostClassifier(iterations=1000, task_type="CPU", loss_function='Logloss', train_dir=str(model_dir),
-                               custom_loss=['AUC', 'Accuracy', 'Precision', 'F1', 'Recall'],
-                               verbose=500)
+        if len(Counter(X.index))==2:
+            m = CatBoostClassifier(iterations=1000, task_type="CPU", loss_function='Logloss', train_dir=str(model_dir),
+                                   custom_loss=['AUC', 'Accuracy', 'Precision', 'F1', 'Recall'],
+                                   verbose=500)
+            m2 = CatBoostClassifier(iterations=1000, task_type="GPU", train_dir=str(model_dir),
+                                    custom_loss=['Accuracy', 'Precision', 'F1', 'Recall'],
+                                    verbose=500)
+        else:
+            m = CatBoostRegressor(iterations=1000, task_type="CPU", loss_function='Logloss', train_dir=str(model_dir),
 
-        m2 = CatBoostClassifier(iterations=1000, task_type="GPU", train_dir=str(model_dir),
-                                custom_loss=['Accuracy', 'Precision', 'F1', 'Recall'],
-                                verbose=500)
+                                   verbose=500)
+            m2 = CatBoostRegressor(iterations=1000, task_type="GPU", train_dir=str(model_dir),
+
+                                    verbose=500)
+
 
         # optimise via grid search
         params = {

@@ -66,30 +66,23 @@ def heatmap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False):
 def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False, z_norm: bool=False, Z=None):
 
     font_size = 5 if Z is not None else 10 if rad_plot else 22
-
     sys.setrecursionlimit(10000)
-    print(data)
     # use_sns = False
     if use_sns:
-        print(data.isnull())
 
         # sns.palplot(sns.color_palette("coolwarm"))
         if data.isnull().values.all():
             return
         try:
+            figheight = len(data)*0.05 if Z is not None else len(data)*0.3
+            figheight = figheight if figheight * 100 < 65536 else 655
             if rad_plot:
-                try:
-                    print("final before clustermap: ", data.loc['original shape VoxelVolume brain lateral ventricle'])
-                except KeyError:
-                    print("No row")
+
                 # row linkage precomputed
                 if Z is not None:
 
                     # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
                     assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
-
-                    figheight = len(data) * 0.05
-                    figheight = figheight if figheight*100 < 65536 else 655
 
                     cg = sns.clustermap(data,
                                         metric="euclidean",
@@ -103,9 +96,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                     # So I have no fucking clue why this needs to be inverted when the raw values are fine and the clustmerap is fine
                     # man seaborn is fucking stupid
-                    figheight = len(data) * 0.3
 
-                    figheight = figheight if figheight*100 < 65536 else 655
 
                     cg = sns.clustermap(data,
                                         metric="euclidean",
@@ -117,12 +108,25 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
                 reordered_ind = cg.dendrogram_row.reordered_ind
-                ylabels = [ylabels[i] for i in reordered_ind]
+
+                xlabels = [x.replace('_', ' ') for x in data.columns]
+
+                reordered_col = cg.dendrogram_col.reordered_ind
+
+
+                cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
+
+                cg.ax_heatmap.set_xticks(np.arange(len(data.columns)) + 0.5)
+                cg.ax_heatmap.set_xticklabels([data.columns[i] for i in reordered_col], rotation=90, ha='center')
+
+
+
 
                 #ylabels = [x.replace('_', ' ') for x in data.index]
-                cg.ax_heatmap.set_yticks(np.arange(len(ylabels)))
-                cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
-                cg.ax_heatmap.set_yticklabels(ylabels, fontsize=font_size, rotation=0)
+                cg.ax_heatmap.set_yticks(np.arange(len(ylabels))+0.5)
+
+                cg.ax_heatmap.set_yticklabels([ylabels[i] for i in reordered_ind], fontsize=font_size, rotation=0, va='center')
+
 
             elif z_norm:
                 cg = sns.clustermap(data,

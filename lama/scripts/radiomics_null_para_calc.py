@@ -7,6 +7,7 @@ import argparse
 from pathlib import Path
 from tqdm import tqdm
 import pandas as pd
+import itertools
 def _two_way_null_line_thread(*args) -> List[float]:
     """
     same as _null_line_thread but for two way
@@ -86,12 +87,11 @@ def main():
     comm = MPI.COMM_WORLD
     rank = comm.Get_rank()
     size = comm.Get_size()
-    print(comm, rank, size)
-
-    data = pd.read_csv(str(_dir/"data_for_null_calc.csv"), index_col=0)
+    #added a memory map
+    data = pd.read_csv(str(_dir/"data_for_null_calc.csv"), index_col=0, memory_map=True)
 
     #num_perms = ...  # specify the number of permutations
-    wt_indx_combinations = pd.read_csv(str(_dir/"combs_for_null_calc.csv"), index_col=0)  # specify the WT index combinations
+    wt_indx_combinations = pd.read_csv(str(_dir/"combs_for_null_calc.csv"), index_col=0, memory_map=True)  # specify the WT index combinations
 
     cols = data.columns.drop(['staging','genotype','treatment'])
 
@@ -104,15 +104,23 @@ def main():
     for label in tqdm(cols[start:end]):
         pvals_list.append(_two_way_null_line_thread(data, num_perms, wt_indx_combinations, label))
 
-    # gather the results from all the ranks
-    all_pvals = comm.gather(pvals_list, root=0)
+    rank_filename = str(_dir / f"pdist_results_{rank}.csv")
+    pd.DataFrame(pvals_list).to_csv(rank_filename)
 
+    # synchronize all ranks before proceeding
+    comm.Barrier()
+
+    # rank 0 combines the results from all ranks into a single file
     if rank == 0:
-        # concatenate the results from all the ranks
-        all_pvals = [item for sublist in all_pvals for item in sublist]
-        # do something with the results
-    print(all_pvals)
-    pd.DataFrame(all_pvals).to_csv(str(_dir/"pdist_results.csv"))
+        combined_df = pd.DataFrame()
+        for i in range(size):
+            # go through each
+            rank_filename = str(_dir / f"pdist_results_{i}.csv")
+            rank_df = pd.read_csv(rank_filename, memory_map=True)
+            if i == 0:
+                rank_df.to_csv(str(_dir / "pdist_results.csv"), mode='w', chunksize=500)
+            else:
+                rank_df.to_csv(str(_dir / "pdist_results.csv"), header=False, mode='a', chunksize=500)
 
 
 if __name__ == '__main__':
