@@ -177,8 +177,6 @@ def test_two_way_alt():
 
 
 
-
-
 def test_two_way_p_thresholds():
     """
      Testing the p_thresholds calculation

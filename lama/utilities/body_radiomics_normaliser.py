@@ -147,11 +147,11 @@ def fill_image(npa, roll=0):
     return npa_hole_filled
 
 
-def pyr_calc_all_features(dir, normed: bool = False, images: list = None, file_names: list = None):
+def pyr_calc_all_features(dir, normed: bool = False, images: list = None, file_names: list = None, use_roi: bool = False):
     # get either the normalised or original images
     scan_paths = images if normed \
         else [spec_path for spec_path in common.get_file_paths(dir) if ('imgs' in str(spec_path))]
-    print(scan_paths)
+
     tumour_paths = [spec_path for spec_path in common.get_file_paths(dir) if ('tumour_respaced' in str(spec_path))]
 
     # debugging - Thanks Neil

@@ -21,7 +21,7 @@ import pacmap
 from lama.scripts import lama_permutation_stats
 from lama.lama_radiomics import radiomics, rad_plotting
 from lama.stats.penetrence_expressivity_plots import heatmaps_for_permutation_stats, filt_for_shared_feats
-
+from joblib import Parallel, delayed
 
 import SimpleITK as sitk
 stats_cfg = Path(
@@ -59,6 +59,9 @@ def test_radiomics():
 
         spherify = c.get('spherify')
 
+        use_roi = c.get('use_roi')
+
+        print("use roi", use_roi)
         ref_vol_path = Path(c.get('ref_vol_path')) if c.get('ref_vol_path') is not None else None
 
         norm_dict = {
@@ -74,9 +77,21 @@ def test_radiomics():
             print(e)
 
             norm_meths = None
+        num_jobs = 1
+        logging.info(f"running with {num_jobs} jobs")
+
+        # Execute the function in parallel using joblib
+        def run_lama_radiomics(i):
+            logging.info(f"running job {i}")
+            radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.NonRegMaskNormalise(),
+                                 norm_label=norm_label, use_roi=use_roi,
+                                 spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=False)
+
+
         logging.info("Starting Radiomics")
-        radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=normalise.NonRegMaskNormalise(), norm_label=norm_label,
-                             spherify=spherify, ref_vol_path=ref_vol_path, make_job_file=True, scan_dir='imgs', tumour_dir='full_contours', stage_dir='stage_labels')
+
+
+        Parallel(n_jobs=-1)(delayed(run_lama_radiomics)(i) for i in range(num_jobs))
 
 
 def test_permutation_stats_just_ovs():
@@ -734,6 +749,17 @@ def test_find_shared_feats():
 
 
 
+
+def test_pdist_fix():
+    pdists = pd.read_csv("E:/fix_pdists/pdist_results.csv", index_col=0)
+    pdists.reset_index(inplace=True)
+    print(pdists.columns)
+
+    pdists.drop(['index','Unnamed: 0.1'], axis=1, inplace=True)
+    print(pdists)
+    print(pdists.columns)
+
+    pdists.to_csv("E:/fix_pdists/fixed_results.csv")
 
 
 

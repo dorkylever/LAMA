@@ -209,46 +209,12 @@ def pyr_normaliser(_dir, _normaliser, scans_imgs, masks: list = None, fold: bool
     return scans_imgs
 
 
-def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None):
+def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None, use_roi: bool=False):
     full_results = pd.Series([])
+
     lab.CopyInformation(img)
 
     arr = sitk.GetArrayFromImage(lab)
-
-    if spherify:  # can be used as a control - makes label a sphere:
-        logging.info("Spherifying")
-        s = ndimage.find_objects(arr)[-1]
-        if spherify == 0:
-            sphere_dir = Path(name).parent.parent / "colat_tumours"
-            os.makedirs(sphere_dir, exist_ok=True)
-            logging.info("Placing tumour as colateral control")
-            lab = sitk.Flip(lab, [False, False, True])
-            sphere_fname = sphere_dir / os.path.basename(name)
-            sitk.WriteImage(lab, str(sphere_fname))
-
-        elif spherify == 1:
-            sphere_dir = Path(name).parent.parent / "spheres"
-            os.makedirs(sphere_dir, exist_ok=True)
-            logging.info("Spherifying in centre of tumour")
-            midpoint = [np.round(np.mean([s[0].start, s[0].stop])) / 512,
-                        np.round((np.mean([s[1].start, s[1].stop]))) / 512,
-                        np.round((np.mean([s[2].start, s[2].stop]))) / 512]
-            arr = rg.sphere(512, 10, midpoint, smoothing=True).astype(np.int_)
-            mask = sitk.GetImageFromArray(arr)
-            sphere_fname = sphere_dir / os.path.basename(name)
-            sitk.WriteImage(mask, str(sphere_fname))
-
-        else:
-            sphere_dir = Path(name).parent.parent / "lateral_spheres"
-            os.makedirs(sphere_dir, exist_ok=True)
-            logging.info("Spherifying as colateral control")
-            midpoint = [np.round(np.mean([s[0].start, s[0].stop])) / 512,
-                        np.round((np.mean([s[1].start, s[1].stop]))) / 512,
-                        np.round(482 - (np.mean([s[2].start, s[2].stop]))) / 512]
-            arr = rg.sphere(512, 10, midpoint, smoothing=True).astype(np.int_)
-            mask = sitk.GetImageFromArray(arr)
-            sphere_fname = sphere_dir / os.path.basename(name)
-            sitk.WriteImage(mask, str(sphere_fname))
 
     extractor = featureextractor.RadiomicsFeatureExtractor()
     extractor.enableAllImageTypes()
@@ -265,14 +231,42 @@ def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None):
             print("null label")
             continue
 
-        mask = sitk.GetImageFromArray(arr_spec)
+        logging.info(f"Doing organ number {org} that has a total number of {np.count_nonzero(arr_spec)} voxels")
 
+        # perform cropping for speed improvements
+        if use_roi:
+            logging.info("Cropping to ROI")
 
-        # make sure its in the same orientation as the image
-        mask.CopyInformation(lab)
+            rigid = sitk.GetArrayFromImage(img)
+            #find the bounding box of the label
+            s = ndimage.find_objects(arr_spec)[-1]
 
+            p = 3
+            #crop to bounding box
+            rigid = rigid[s[0].start - p: s[0].stop + p,
+                   s[1].start - p: s[1].stop + p,
+                   s[2].start - p: s[2].stop + p]
 
-        result = extractor.execute(img, mask)
+            arr_spec = arr_spec[s[0].start - p: s[0].stop + p,
+                   s[1].start - p: s[1].stop + p,
+                   s[2].start - p: s[2].stop + p]
+
+            # can't copy metadata, so just get image from array
+
+            crop_img = sitk.GetImageFromArray(rigid)
+            mask = sitk.GetImageFromArray(arr_spec)
+            logging.info("Extracting data")
+            result = extractor.execute(crop_img, mask)
+
+        else:
+            mask = sitk.GetImageFromArray(arr_spec)
+
+            # make sure its in the same orientation as the image
+            mask.CopyInformation(lab)
+            mask.CopyInformation(img)
+            logging.info("Extracting data")
+            result = extractor.execute(img, mask)
+
 
         features = pd.DataFrame.from_dict(result, orient='index',
                                           columns=[org]).transpose()
@@ -283,13 +277,16 @@ def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None):
         #features = features.T.rename(columns={0: org})
         results_list.append(features)
 
+    logging.info("all organs done, concatenating results")
+
     full_results = pd.concat(results_list, axis=0)
+
 
     return full_results
 
 
 def run_radiomics(rad_dir, rigids, labels, name, labs_of_int,
-                  norm_method, norm_label=None, spherify=None, ref_vol_path=None):
+                  norm_method, norm_label=None, spherify=None, ref_vol_path=None, use_roi:bool=False):
     """
 
     Parameters
@@ -300,7 +297,7 @@ def run_radiomics(rad_dir, rigids, labels, name, labs_of_int,
     signal.signal(signal.SIGINT, common.service_shutdown)
     mem_monitor = MonitorMemory(Path(rad_dir).absolute())
 
-    features = pyr_calc_all_features(rigids, labels, name, labs_of_int, spherify=spherify)
+    features = pyr_calc_all_features(rigids, labels, name, labs_of_int, spherify=spherify, use_roi=use_roi)
 
     feature_dir = rad_dir / "features"
 
@@ -318,6 +315,7 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
                          norm_method=normalise.IntensityN4Normalise(),
                          norm_label=None, spherify=None,
                          ref_vol_path=None,
+                         use_roi: bool=False,
                          make_job_file: bool=False, fold: bool=False, scan_dir=None, tumour_dir=None, stage_dir=None):
     '''
     Performs the pyradiomic calculations
@@ -519,8 +517,9 @@ def radiomics_job_runner(target_dir, labs_of_int=None,
         # try:
         try:
             logging.info(f'trying {img.img_path} and {lab_path}')
+
             run_radiomics(rad_dir, img.img, lab.img, img.img_path,
-                          labs_of_int, norm_method, norm_label=norm_label, spherify=spherify)
+                          labs_of_int, norm_method, norm_label=norm_label, spherify=spherify, use_roi=use_roi)
 
         except Exception as e:
             if e.__class__.__name__ == 'KeyboardInterrupt':

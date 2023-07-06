@@ -1,21 +1,21 @@
 # Radiomics config v1 - Kyle Drover
 
-target_dir = 'E:\220204_BQ_dataset\scans_for_sphere_creation'
+target_dir = 'E:\test_gina_data\'
 
 # labels of interest
-labs_of_int = '1'
+#labs_of_int = '1'
 
-norm_methods = 'subtraction'
+norm_methods = 'histogram'
 
-norm_label = true
+norm_label = false
 
 #spherify = 0
 
-ref_vol_path = 'E:\220204_BQ_dataset\scans_for_sphere_creation\radiomics_output\rigids\200721_MPTLVo3_CT_4T1_Ms_D7_C1_002.nrrd'
+ref_vol_path = 'E:\test_gina_data\radiomics_output\rigids\Nadsyn1_E17.5_685_HET_FEMALE-Small.nrrd'
 
+use_roi = true
+#stage_dir = 'stage_labels'
 
-stage_dir = 'stage_labels'
+#scan_dir = 'imgs'
 
-scan_dir = 'imgs'
-
-tumour_dir = 'sphere_15'
+#tumour_dir = 'sphere_15'

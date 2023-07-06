@@ -38,6 +38,8 @@ def main():
 
         spherify = c.get('spherify')
 
+        use_roi = c.get('use_roi')
+
         fold = c.get('fold')
 
         stage_dir = c.get('stage_dir')
@@ -68,7 +70,7 @@ def main():
         print(norm_meths)
         radiomics_job_runner(target_dir, labs_of_int=labs_of_int, norm_method=norm_meths, spherify=spherify,
                              ref_vol_path=ref_vol_path, norm_label=norm_label, make_job_file=args.make_job_file,
-                             fold=fold, scan_dir=scan_dir, stage_dir=stage_dir, tumour_dir=tumour_dir)
+                             fold=fold, scan_dir=scan_dir, stage_dir=stage_dir, tumour_dir=tumour_dir, use_roi=use_roi)
     except pd.errors.EmptyDataError as e:
         logging.exception(f'pandas read failure {e}')
 
