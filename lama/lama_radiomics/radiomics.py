@@ -18,7 +18,7 @@ from lama.img_processing import normalise
 from scipy import ndimage
 import raster_geometry as rg
 import subprocess
-
+from joblib import Parallel, delayed
 # test push
 # lets try this
 JOBFILE_NAME = 'radiomics_jobs.csv'
@@ -222,16 +222,19 @@ def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None, use_roi: b
 
     results_list =[]
     # TODO: reduce dimensionality?
-    for i, org in enumerate(labs_of_int):
+    def process_iteration(org):
         # remove other labels
+        print(org)
 
         arr_spec = np.where(arr == org, 1, 0)
 
-        if np.count_nonzero(arr_spec) < 1000:
-            print("null label")
-            continue
-
         logging.info(f"Doing organ number {org} that has a total number of {np.count_nonzero(arr_spec)} voxels")
+
+        if np.count_nonzero(arr_spec) < 500:
+            print("null label")
+            return
+
+
 
         # perform cropping for speed improvements
         if use_roi:
@@ -275,7 +278,11 @@ def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None, use_roi: b
 
         features = features.drop(columns=[col for col in features.columns if 'diagnostics' in col])
         #features = features.T.rename(columns={0: org})
-        results_list.append(features)
+        return features
+
+    results_list = Parallel(n_jobs=4)(
+        delayed(process_iteration)(org) for i, org in enumerate(labs_of_int)
+    )
 
     logging.info("all organs done, concatenating results")
 

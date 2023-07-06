@@ -77,7 +77,7 @@ def test_radiomics():
             print(e)
 
             norm_meths = None
-        num_jobs = 1
+        num_jobs = 3
         logging.info(f"running with {num_jobs} jobs")
 
         # Execute the function in parallel using joblib
