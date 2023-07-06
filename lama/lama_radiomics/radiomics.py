@@ -280,7 +280,7 @@ def pyr_calc_all_features(img, lab, name, labs_of_int, spherify=None, use_roi: b
         #features = features.T.rename(columns={0: org})
         return features
 
-    results_list = Parallel(n_jobs=4)(
+    results_list = Parallel(n_jobs=-1)(
         delayed(process_iteration)(org) for i, org in enumerate(labs_of_int)
     )
 
