@@ -269,6 +269,8 @@ def _make_red_cyan_qc_images(target: np.ndarray,
     # put slices in folders by orientation
     for i in range(len(oris)):
         grey = s[i]
+        # Kyle for some reason - you need to save the uint8 as uint8 again for the file-write
+        grey = grey.astype(np.uint8)
         rgb = _red_cyan_overlay(s[i], t[i])
         if not oris[i] == 'axial':
             rgb = np.flipud(rgb)

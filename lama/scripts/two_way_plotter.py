@@ -8,21 +8,9 @@ import tempfile
 PLOT_SCRIPT = str(common.lama_root_dir / 'stats' / 'rscripts' / 'two_way_plot.R')
 
 
-def main():
-    import argparse
 
-    parser = argparse.ArgumentParser("plot way data and get segmentations of interest")
-    parser.add_argument('-i', dest='root_dir',
-                        help='Folder with Registration results, (i.e. wild_type_and_mutant_data)',
-                        required=True)
-    parser.add_argument('-l', dest='labs',
-                        help='labels of interest (list of numbers - look at label_info for numbers)',
-                        required=True)
+def main(root_dir, labs):
 
-    args = parser.parse_args()
-    root_dir = Path(args.root_dir)
-
-    labs = [float(i) for i in args.labs.split(",")] if "," in args.labs else float(args.labs)
 
     logging.info("Extracting Volumes and Labels of Interest")
     extract_registrations.main(root_dir)
@@ -63,4 +51,20 @@ def main():
 
 
 if __name__ == '__main__':
-    main()
+    #import argparse
+
+    #parser = argparse.ArgumentParser("plot way data and get segmentations of interest")
+    #parser.add_argument('-i', dest='root_dir',
+    #                    help='Folder with Registration results, (i.e. wild_type_and_mutant_data)',
+    #                    required=True)
+    #parser.add_argument('-l', dest='labs',
+    #                    help='labels of interest (list of numbers - look at label_info for numbers)',
+    #                    required=True)
+
+    #rgs = parser.parse_args()
+    root_dir = Path("V:/230612_res")
+
+    #labs = [float(i) for i in args.labs.split(",")] if "," in args.labs else float(args.labs)
+    labs = [1, 4, 17]
+
+    main(root_dir, labs)

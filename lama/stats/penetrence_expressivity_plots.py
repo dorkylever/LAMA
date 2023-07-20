@@ -85,6 +85,7 @@ def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_
     if two_way: # read data.csv  to get the conditions
         data_path = root_dir / "radiomics_data.csv" if rad_plot else root_dir / "input_data.csv"
         data = pd.read_csv(data_path, index_col=0)
+        print(data)
         #if rad_plot:
         #    data.set_index(['vol'], inplace=True)
         group_info = data['line']
@@ -99,6 +100,7 @@ def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_
         if two_way:
             line_dir = root_dir / 'two_way'
             spec_dir = line_dir / 'specimen_level'
+            print(spec_dir)
 
             file_lists = {
                 'inter': [],
@@ -107,6 +109,7 @@ def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_
             }
 
             for s_dir in spec_dir.iterdir():
+                s_files = list(s_dir.iterdir())
                 scsv = next(s_dir.iterdir())
                 if s_dir.name in inter_names:
                     file_lists['inter'].append(scsv)
@@ -257,13 +260,13 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
                 heat_df.columns = [x.split("org")[0] for x in heat_df.columns]
 
 
-            if not heatmap(heat_df, title=title, use_sns=True, rad_plot=rad_plot):
-                logging.info(f'Skipping heatmap for {line} as there are no results')
+            #if not heatmap(heat_df, title=title, use_sns=True, rad_plot=rad_plot):
+            #    logging.info(f'Skipping heatmap for {line} as there are no results')
 
-            plt.tight_layout()
+            #plt.tight_layout()
 
-            plt.savefig(outdir / f"{line}_organ_hit_heatmap.png")
-            plt.close()
+            #plt.savefig(outdir / f"{line}_organ_hit_heatmap.png")
+            #plt.close()
 
 
             #sns.clustermap needs non-nan values to calculate distances
@@ -294,14 +297,14 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             plt.close()
 
 
-            logging.info("Creating Additional z-normalised plots")
-            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True,Z=Z):
-                logging.info(f'Skipping heatmap for {line} as there are no results')
+            #logging.info("Creating Additional z-normalised plots")
+            #if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True,Z=Z):
+            #    logging.info(f'Skipping heatmap for {line} as there are no results')
 
-            plt.tight_layout()
+            #plt.tight_layout()
 
-            plt.savefig(outdir / f"{line}_organ_hit_clustermap_z_normed.png")
-            plt.close()
+            #plt.savefig(outdir / f"{line}_organ_hit_clustermap_z_normed.png")
+            #plt.close()
 
             logging.info("creating heatmaps per organ")
 

@@ -142,6 +142,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                     metric="euclidean",
                                     cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=40, n=512, center="light",
                                                                as_cmap=True),
+                                    center=1,
                                     cbar_kws={'label': 'mean volume ratio'},
                                     square=True)
 
