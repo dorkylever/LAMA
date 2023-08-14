@@ -29,6 +29,7 @@ from lama.elastix.propagate_volumes import PropagateHeatmap
 from lama.img_processing.normalise import Normaliser
 from lama.qc import organ_vol_plots
 
+from lama.scripts import JacobianOutliers
 
 def run(config_path: Path,
         wt_dir: Path,
@@ -207,6 +208,11 @@ def run(config_path: Path,
                         else:
                             invert_heatmaps(line_heatmap, line_stats_out_dir, line_reg_dir, line_input_data)
                             logging.info('Finished writing heatmaps.')
+
+                if stats_config('jac_out'):
+                    jacobianOutliers.main()
+
+
 
  
                 logging.info(f"Finished processing line: {line_id} - All done")                  

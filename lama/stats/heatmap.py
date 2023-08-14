@@ -77,13 +77,39 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
             figheight = len(data)*0.05 if Z is not None else len(data)*0.3
             figheight = figheight if figheight * 100 < 65536 else 655
             if rad_plot:
+                def get_additional_info(idx, si, ei=None):
+                    split_idx = idx.split(' ')
+                    start_index = si+1 if 'wavelet' in idx else si
+                    if ei is not None:
+                        ei = ei + 1 if 'wavelet' in idx else ei
+                    processed_string = ' '.join(split_idx[start_index:ei]) if ei else ' '.join(split_idx[start_index:])
+                    return processed_string
+
+                org_name = data.index.to_series().apply(get_additional_info, si=3).to_list()
+                org_lut = dict(zip(set(org_name), sns.hls_palette(len(set(org_name)), l=0.5, s=0.8)))
+                org_row_colors = pd.DataFrame(org_name)[0].map(org_lut)
+
+                print(set(org_name))
+
+                filter_name = data.index.to_series().apply(get_additional_info, si=0, ei=1).to_list()
+                filt_lut = dict(zip(set(filter_name), sns.hls_palette(len(set(filter_name)), l=0.5, s=0.8)))
+                filt_row_colors = pd.DataFrame(filter_name)[0].map(filt_lut)
+
+                type_name = data.index.to_series().apply(get_additional_info, si=1, ei=2).to_list()
+                type_lut = dict(zip(set(type_name), sns.hls_palette(len(set(type_name)), l=0.5, s=0.8)))
+                type_row_colors = pd.DataFrame(type_name)[0].map(type_lut)
+
+
+                print(org_name)
+                print(filter_name)
+                print(type_name)
 
                 # row linkage precomputed
                 if Z is not None:
 
                     # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
                     assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
-
+                    print(data)
                     cg = sns.clustermap(data,
                                         metric="euclidean",
                                         row_linkage=Z,
@@ -91,6 +117,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                        row_colors=[org_row_colors, filt_row_colors, type_row_colors],
                                         figsize=[30, figheight])
                 else:
 
@@ -104,6 +131,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                        row_colors=[org_row_colors, filt_row_colors, type_row_colors],
                                         figsize=[30, figheight])
 
                 ylabels = [x.replace('_', ' ') for x in data.index]

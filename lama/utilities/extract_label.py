@@ -7,7 +7,7 @@ from scipy import ndimage
 import numpy as np
 
 
-def main(target_dir, labs_of_interest: list = [17]):
+def main(target_dir, labs_of_interest: list = [1,4]):
     label_paths = [spec_path for spec_path in common.get_file_paths(target_dir) if
                    ('inverted_labels' in str(spec_path))]
 

@@ -10,9 +10,9 @@ from lama import common
 def main(target_dir):
 
 
-    reg_paths = [spec_path for spec_path in common.get_file_paths(target_dir) if ('registrations' in str(spec_path))]
+    #reg_paths = [spec_path for spec_path in common.get_file_paths(target_dir) if ('registrations' in str(spec_path))]
 
-    rigid_paths = [spec_path for spec_path in reg_paths if ('rigid' in str(spec_path))]
+    rigid_paths = [spec_path for spec_path in common.get_file_paths(target_dir)if ('rigid' in str(spec_path))]
 
 
 
