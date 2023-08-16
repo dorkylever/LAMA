@@ -85,31 +85,46 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                     processed_string = ' '.join(split_idx[start_index:ei]) if ei else ' '.join(split_idx[start_index:])
                     return processed_string
 
+                #l = 0.5, s = 0.8
+
+                feature_info = pd.read_csv("V:/230612_target/target/feature_info.csv")
+                org_list = feature_info.org_name.dropna().to_list()
                 org_name = data.index.to_series().apply(get_additional_info, si=3).to_list()
-                org_lut = dict(zip(set(org_name), sns.hls_palette(len(set(org_name)), l=0.5, s=0.8)))
+                org_lut = dict(zip(org_list, sns.husl_palette(len(org_list))))
+
+                org_lut_real = {key: value for key, value in org_lut.items() if key in org_name}
+
                 org_row_colors = pd.DataFrame(org_name)[0].map(org_lut)
 
-                print(set(org_name))
+
 
                 filter_name = data.index.to_series().apply(get_additional_info, si=0, ei=1).to_list()
-                filt_lut = dict(zip(set(filter_name), sns.hls_palette(len(set(filter_name)), l=0.5, s=0.8)))
+                #filt_lut = dict(zip(set(filter_name), sns.cubehelix_palette(len(set(filter_name)), dark=0, light=1, rot=0.7)))
+                filt_list = feature_info.filter_name.dropna().to_list()
+
+                filt_lut = dict(zip(filt_list, sns.color_palette(palette='spring', n_colors=len(filt_list))))
+
+                filt_lut_real = {key: value for key, value in filt_lut.items() if key in filter_name}
+
                 filt_row_colors = pd.DataFrame(filter_name)[0].map(filt_lut)
 
+                print(filt_row_colors)
+
                 type_name = data.index.to_series().apply(get_additional_info, si=1, ei=2).to_list()
-                type_lut = dict(zip(set(type_name), sns.hls_palette(len(set(type_name)), l=0.5, s=0.8)))
+                type_list = feature_info.type_name.dropna().to_list()
+                type_lut = dict(zip(type_list, sns.color_palette(palette='viridis', n_colors=len(type_list))))
+                type_lut_real = {key: value for key, value in type_lut.items() if key in type_name}
                 type_row_colors = pd.DataFrame(type_name)[0].map(type_lut)
 
+                print(type_row_colors)
 
-                print(org_name)
-                print(filter_name)
-                print(type_name)
 
                 # row linkage precomputed
                 if Z is not None:
 
                     # just making sure that there's no empty or infinite data somehow in the predcomputed distance matrix
                     assert not np.any(np.isnan(Z)) and not np.any(np.isinf(Z))
-                    print(data)
+
                     cg = sns.clustermap(data,
                                         metric="euclidean",
                                         row_linkage=Z,
@@ -117,7 +132,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
-                                        row_colors=[org_row_colors, filt_row_colors, type_row_colors],
+                                        row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                         figsize=[30, figheight])
                 else:
 
@@ -131,8 +146,25 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                                                    as_cmap=True),
                                         center=1,
                                         cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
-                                        row_colors=[org_row_colors, filt_row_colors, type_row_colors],
+                                        row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                         figsize=[30, figheight])
+
+
+
+                org_legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=label,
+                                                 markerfacecolor=color) for label, color in org_lut_real.items()]
+
+                type_legend_handles = [plt.Line2D([0], [0], marker='s', color='w', label=label,
+                                                  markerfacecolor=color) for label, color in type_lut_real.items()]
+
+                filt_legend_handles = [plt.Line2D([0], [0], marker='^', color='w', label=label,
+                                                  markerfacecolor=color) for label, color in filt_lut_real.items()]
+
+                all_legend_handles = org_legend_handles + type_legend_handles + filt_legend_handles
+                all_labels = [h.get_label() for h in all_legend_handles]
+
+                # Create a custom legend using the combined handles and labels
+                plt.legend(all_legend_handles, all_labels, loc='upper left', prop={'size': 14})
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
                 reordered_ind = cg.dendrogram_row.reordered_ind
@@ -146,8 +178,6 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                 cg.ax_heatmap.set_xticks(np.arange(len(data.columns)) + 0.5)
                 cg.ax_heatmap.set_xticklabels([data.columns[i] for i in reordered_col], rotation=90, ha='center')
-
-
 
 
                 #ylabels = [x.replace('_', ' ') for x in data.index]
