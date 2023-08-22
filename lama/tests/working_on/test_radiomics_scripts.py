@@ -702,33 +702,33 @@ def test_find_shared_feats():
 
         results_dict[key] = pd.concat(list(results.values()), axis=1)
 
-        for num_rows, df in results.items():
+        #for num_rows, df in results.items():
+        #
+        #    df.clip(upper=2, lower=0, inplace=True)
+        #    df = df.transpose()
+        #    if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
+        #        logging.info(f'Skipping heatmap for {num_rows} as there are no results')
 
-            df.clip(upper=2, lower=0, inplace=True)
-            df = df.transpose()
-            if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
-                logging.info(f'Skipping heatmap for {num_rows} as there are no results')
+        #    plt.tight_layout()
 
-            plt.tight_layout()
-
-            plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
-            plt.close()
+        #    plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
+        #    plt.close()
 
 
 
     inters = results_dict.get("inter")
-    print("inters", inters)
+
 
 
     genos = results_dict.get("geno")
     genos = genos.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
 
-    print("genos", genos)
+
     treats = results_dict.get("treat")
 
     treats = treats.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
 
-    print("treats", treats)
+
 
     #assert list(inters.columns) == list(genos.columns) == list(treats.columns), "Column names are not identical"
 
@@ -758,15 +758,15 @@ def test_find_shared_feats():
     full_dataset.clip(upper=2, lower=0, inplace=True)
     full_dataset = full_dataset.transpose()
 
-    if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
-        logging.info('Skipping heatmap for as there are no results')
+    #if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
+    #    logging.info('Skipping heatmap for as there are no results')
 
-    plt.tight_layout()
-    plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
-    plt.close()
+    #plt.tight_layout()
+    #plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
+    #plt.close()
 
 
-    if not clustermap(full_dataset, title="Hooly", use_sns=True, rad_plot=True):
+    if not clustermap(full_dataset, title="Hooly", use_sns=True, rad_plot=True, add_col_labels=True):
         logging.info('Skipping heatmap for as there are no results')
 
     plt.tight_layout()

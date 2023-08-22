@@ -241,9 +241,9 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
         #X.set_index('condition', inplace=True)
 
-        X['HPE'] = X['HPE'].map({'normal': 0, 'semilobar': 0.7, 'alobar': 1}).astype(float)
+        X['HPE'] = X['HPE'].map({'normal': 0, 'semilobar': 1, 'alobar': 1}).astype(int)
         X.set_index('HPE', inplace=True)
-        print(X)
+
         #X.dropna(axis=1, inplace=True)
         #X = X[X['background'] == 'C3HHEH']
         #X['genotype'] = X['genotype'].map({'WT': 0, 'HET': 1}).astype(int)
@@ -309,7 +309,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         logging.info("oversampling via smote")
         X = smote_oversampling(X, n_test) if n_test < 5 else smote_oversampling(X)
 
-    #X.to_csv("E:/220204_BQ_dataset/scans_for_sphere_creation/full_cont_res/results_for_ml/full_results_smoted.csv")
+    X.to_csv(str("full_results_smoted.csv"))
 
     logging.info("fitting model to training data")
     m = CatBoostClassifier(iterations=1000, task_type='CPU', verbose=500, train_dir=org_dir) if len(Counter(X.index))==2 else CatBoostRegressor(iterations=1000, task_type='CPU', verbose=500, train_dir=org_dir)
@@ -396,7 +396,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
 
         cv_data = cv(params=m.get_params(),
                      pool=all_x,
-                     fold_count=int(loo.get_n_splits()/2),
+                     fold_count=30,
                      shuffle=True,
                      stratified=True,
                      verbose=500,
