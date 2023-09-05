@@ -684,12 +684,12 @@ def test_secondary_dataset_confusion_matrix():
 
 def test_find_shared_feats():
 
-    inter_dataset = pd.read_csv("V:/230612_two_way/two_way/inter_organ_hit_dataset.csv", index_col=0)
-    geno_dataset = pd.read_csv("V:/230612_two_way/two_way/geno_organ_hit_dataset.csv", index_col=0)
-    treat_dataset = pd.read_csv("V:/230612_two_way/two_way/treat_organ_hit_dataset.csv", index_col=0)
+    inter_dataset = pd.read_csv("V:/230905_head_text_stuff/two_way/inter_organ_hit_dataset.csv", index_col=0)
+    geno_dataset = pd.read_csv("V:/230905_head_text_stuff/two_way/geno_organ_hit_dataset.csv", index_col=0)
+    treat_dataset = pd.read_csv("V:/230905_head_text_stuff/two_way/treat_organ_hit_dataset.csv", index_col=0)
 
     print(inter_dataset)
-    outdir = Path("V:/230612_two_way/two_way/")
+    outdir = Path("V:/230905_head_text_stuff/two_way/")
 
     results_dict = {}
 
@@ -702,17 +702,17 @@ def test_find_shared_feats():
 
         results_dict[key] = pd.concat(list(results.values()), axis=1)
 
-        #for num_rows, df in results.items():
-        #
-        #    df.clip(upper=2, lower=0, inplace=True)
-        #    df = df.transpose()
-        #    if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
-        #        logging.info(f'Skipping heatmap for {num_rows} as there are no results')
+        for num_rows, df in results.items():
 
-        #    plt.tight_layout()
+            df.clip(upper=2, lower=0, inplace=True)
+            df = df.transpose()
+            if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
+                logging.info(f'Skipping heatmap for {num_rows} as there are no results')
 
-        #    plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
-        #    plt.close()
+            plt.tight_layout()
+
+            plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
+            plt.close()
 
 
 
@@ -758,12 +758,14 @@ def test_find_shared_feats():
     full_dataset.clip(upper=2, lower=0, inplace=True)
     full_dataset = full_dataset.transpose()
 
-    #if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
-    #    logging.info('Skipping heatmap for as there are no results')
+    unique_feats_HPE.clip(upper=2, lower=0, inplace=True)
 
-    #plt.tight_layout()
-    #plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
-    #plt.close()
+    if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
+        logging.info('Skipping heatmap for as there are no results')
+
+    plt.tight_layout()
+    plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
+    plt.close()
 
 
     if not clustermap(full_dataset, title="Hooly", use_sns=True, rad_plot=True, add_col_labels=True):
@@ -927,9 +929,9 @@ def test_permutation_stats():
 
 
 def test_two_way_pene_plots():
-    _dir = Path("V:/230612_perm_stats/permutation_stats/perm_output/")
-    _label_dir = Path("V:/new_feats/E14_5_atlas_v24_43_label_info_v3.csv")
-    heatmaps_for_permutation_stats(root_dir=_dir, two_way=True, label_info_file=_label_dir, rad_plot=False)
+    _dir = Path("V:/230905_head_text_stuff/")
+    _label_dir = Path("V:/230612_target/target/E14_5_atlas_v24_43_label_info_v5.csv")
+    heatmaps_for_permutation_stats(root_dir=_dir, two_way=True, label_info_file=_label_dir, rad_plot=True)
 
 
 def test_sns_clustermap():

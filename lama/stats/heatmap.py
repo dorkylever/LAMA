@@ -12,6 +12,7 @@ import matplotlib
 import scipy.spatial as sp, scipy.cluster.hierarchy as hc
 from scipy.stats import zscore
 import sys
+import matplotlib.patches as mpatches
 
 def heatmap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False):
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -83,7 +84,8 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
         if data.isnull().values.all():
             return
         try:
-            figheight = len(data)*0.05 if Z is not None else len(data)*0.3
+            #figheight = len(data)*0.05 if Z is not None else len(data)*0.3
+            figheight=45
             figheight = figheight if figheight * 100 < 65536 else 655
             if rad_plot:
                 #l = 0.5, s = 0.8
@@ -166,7 +168,6 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
-                                            dendrogram_ratio=0.5,
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
@@ -174,7 +175,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                             cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[30, figheight])
+                                            figsize=[60, figheight])
                     else:
                         cg = sns.clustermap(data,
                                             metric="euclidean",
@@ -186,7 +187,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                             cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[30, figheight])
+                                            figsize=[45, figheight])
 
                 else:
 
@@ -197,7 +198,6 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
-                                            dendrogram_ratio=0.5,
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
@@ -206,12 +206,11 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                             col_colors=[geno_row_colors, back_row_colors],
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[30, figheight])
+                                            figsize=[60, figheight])
                     else:
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
-                                            dendrogram_ratio=0.02,
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
@@ -219,7 +218,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                             cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[30, figheight])
+                                            figsize=[45, figheight])
 
                 # create an entry in the figure legend for organ, type and filter
                 print("just test this shit")
@@ -232,21 +231,54 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 filt_legend_handles = [plt.Line2D([0], [0], marker='^', color='w', label=label,
                                                   markerfacecolor=color) for label, color in filt_lut_real.items()]
 
+                org_legend_patch = mpatches.Patch(label='Organ:', color='None', linestyle='None')
+                type_legend_patch = mpatches.Patch(label='Feature Category:', color='None', linestyle='None')
+                filt_legend_patch = mpatches.Patch(label='Filter:', color='None', linestyle='None')
 
 
 
                 if add_col_labels:
-                    all_legend_handles = org_legend_handles + type_legend_handles + filt_legend_handles+geno_legend_handles+back_legend_handles
+                    geno_legend_patch = mpatches.Patch(label='Genotype:', color='None', linestyle='None')
+                    back_legend_patch = mpatches.Patch(label='Backgound:', color='None', linestyle='None')
+
+                    all_legend_handles = [org_legend_patch] +org_legend_handles + \
+                                         [type_legend_patch] + type_legend_handles +\
+                                         [filt_legend_patch] + filt_legend_handles+\
+                                         [geno_legend_patch] +geno_legend_handles+\
+                                         [back_legend_patch] +back_legend_handles
+
+                    all_labels = ["Organs:"]+[h.get_label() for h in org_legend_handles]+\
+                                 ["Feature Category:"] + [h.get_label() for h in type_legend_handles]+\
+                                 ["Filter:"]+ [h.get_label() for h in filt_legend_handles]+\
+                                  ["Genotype:"]+ [h.get_label() for h in filt_legend_handles]+\
+                                  ["Background:"]+ [h.get_label() for h in filt_legend_handles]
+
+
 
                 else:
                 # you can only do one legend - so add them together???
-                    all_legend_handles = org_legend_handles + type_legend_handles + filt_legend_handles
+                    all_legend_handles = [org_legend_patch] + org_legend_handles + \
+                                         [type_legend_patch] + type_legend_handles + \
+                                         [filt_legend_patch] + filt_legend_handles
 
-                all_labels = [h.get_label() for h in all_legend_handles]
+                all_labels = ["Organ:"] + [h.get_label() for h in org_legend_handles] + \
+                             ["Feature Category:"] + [h.get_label() for h in type_legend_handles] + \
+                             ["Filter:"] + [h.get_label() for h in filt_legend_handles]
+
+                #all_labels = [h.get_label() for h in all_legend_handles]
+
+
+
+
+                #all_legend_handles = [org_legend_patch, type_legend_patch, filt_legend_patch] + all_legend_handles
+                #all_labels = ['Organ', 'Feature Category', 'Filter'] + all_labels
 
                 # Create a custom legend using the combined handles and labels
-                plt.legend(all_legend_handles, all_labels, loc='upper left', prop={'size': 18})
+                plt.legend(all_legend_handles, all_labels, loc='center', prop={'size': 18}, ncol=2)
 
+
+
+                plt.subplots_adjust(right=1.5, top=1)
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
                 reordered_ind = cg.dendrogram_row.reordered_ind
@@ -270,12 +302,12 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                 cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col],fontsize=24, rotation=90, ha='center')
 
-                col = cg.ax_col_dendrogram.get_position()
-                cg.ax_col_dendrogram.set_position([col.x0, col.y0, col.width, col.height])
+                #col = cg.ax_col_dendrogram.get_position()
+                #cg.ax_col_dendrogram.set_position([col.x0, col.y0, col.width, col.height])
                 #ylabels = [x.replace('_', ' ') for x in data.index]
-                cg.ax_heatmap.set_yticks(np.arange(len(ylabels))+0.5)
+                #cg.ax_heatmap.set_yticks(np.arange(len(ylabels))+0.5)
 
-                cg.ax_heatmap.set_yticklabels([ylabels[i] for i in reordered_ind], fontsize=font_size, rotation=0, va='center')
+                #cg.ax_heatmap.set_yticklabels([ylabels[i] for i in reordered_ind], fontsize=font_size, rotation=0, va='center')
 
 
 
