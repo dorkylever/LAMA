@@ -3,6 +3,7 @@ Seaborn 0.9.0 gives missing rows for some reason. So use matplotlib directly ins
 """
 
 import matplotlib.pyplot as plt
+from matplotlib.pyplot import gcf
 import pandas as pd
 from logzero import logger as logging
 import numpy as np
@@ -75,7 +76,7 @@ def get_additional_info(idx, si, ei=None):
 def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False, z_norm: bool=False, Z=None, add_col_labels=None):
 
     print("add_col", add_col_labels)
-    font_size = 5 if Z is not None else 10 if rad_plot else 22
+    font_size = 5 if Z is not None else 16 if rad_plot else 22
     sys.setrecursionlimit(10000)
     # use_sns = False
     if use_sns:
@@ -85,7 +86,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
             return
         try:
             #figheight = len(data)*0.05 if Z is not None else len(data)*0.3
-            figheight=45
+            figheight=60
             figheight = figheight if figheight * 100 < 65536 else 655
             if rad_plot:
                 #l = 0.5, s = 0.8
@@ -142,20 +143,15 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                     backs = merged_data["Background"]
                     #backs = [row for row in backs if row.index in data.columns]
                     backs_lut = dict(zip(set(backs), sns.color_palette(palette='Set2', n_colors=len(set(backs)))))
-                    print(backs.map(backs_lut))
-                    print(backs.map(backs_lut).loc[data.columns])
-                    back_row_colors = backs.map(backs_lut).loc[data.columns].dropna()
-                    print(back_row_colors)
 
-                    geno_legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=label,
+                    back_row_colors = backs.map(backs_lut).loc[data.columns].dropna()
+
+                    geno_legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=label, markersize=20,
                                                      markerfacecolor=color) for label, color in genos_lut.items()]
 
-                    print(geno_legend_handles)
 
-
-                    back_legend_handles = [plt.Line2D([0], [0], marker='s', color='w', label=label,
+                    back_legend_handles = [plt.Line2D([0], [0], marker='s', color='w', label=label, markersize=20,
                                                       markerfacecolor=color) for label, color in backs_lut.items()]
-                    print(back_legend_handles)
 
 
                 # row linkage precomputed
@@ -168,26 +164,30 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
+                                            dendrogram_ratio=(.1, .2),
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
                                             center=1,
-                                            cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                            cbar_kws={'label': 'mean ratio of radiological measurement',"shrink": 0.5},
+                                            square=True, yticklabels=False,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[60, figheight])
+                                            figsize=[100, figheight])
                     else:
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
+                                            dendrogram_ratio=(.1, .2),
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
                                             center=1,
-                                            cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                            cbar_kws={'label': 'mean ratio of radiological measurement',"shrink": 0.5},
+                                            square=True, yticklabels=False,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[45, figheight])
+                                            figsize=[100, figheight])
 
                 else:
 
@@ -198,87 +198,93 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
+                                            dendrogram_ratio=(.1, .2),
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
                                             center=1,
-                                            cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                            cbar_kws={'label': 'mean ratio of radiological measurement', "shrink": 0.5},
+                                            square=True, yticklabels=False,
                                             col_colors=[geno_row_colors, back_row_colors],
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[60, figheight])
+                                            figsize=[100, figheight])
                     else:
                         cg = sns.clustermap(data,
                                             metric="euclidean",
                                             row_linkage=Z,
+                                            dendrogram_ratio=(.1, .2),
                                             cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=1, n=512,
                                                                        center="light",
                                                                        as_cmap=True),
                                             center=1,
-                                            cbar_kws={'label': 'mean ratio of radiological measurement'}, square=True,
+                                            cbar_kws={'label': 'mean ratio of radiological measurement', "shrink": 0.5},
+                                            square=True, yticklabels=False,
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
                                             figsize=[45, figheight])
 
                 # create an entry in the figure legend for organ, type and filter
-                print("just test this shit")
-                org_legend_handles = [plt.Line2D([0], [0], marker='o', color='w', label=label,
+                # create the legend handles (i.e. the keys for the legends)
+                org_legend_handles = [plt.Line2D([0], [0], marker='o', color='None', label=label, markersize=20,
                                                  markerfacecolor=color) for label, color in org_lut_real.items()]
 
-                type_legend_handles = [plt.Line2D([0], [0], marker='s', color='w', label=label,
+                type_legend_handles = [plt.Line2D([0], [0], marker='^', color='w', label=label,markersize=20,
                                                   markerfacecolor=color) for label, color in type_lut_real.items()]
 
-                filt_legend_handles = [plt.Line2D([0], [0], marker='^', color='w', label=label,
+                filt_legend_handles = [plt.Line2D([0], [0], marker='^', color='None', label=label,markersize=20,
                                                   markerfacecolor=color) for label, color in filt_lut_real.items()]
 
-                org_legend_patch = mpatches.Patch(label='Organ:', color='None', linestyle='None')
-                type_legend_patch = mpatches.Patch(label='Feature Category:', color='None', linestyle='None')
-                filt_legend_patch = mpatches.Patch(label='Filter:', color='None', linestyle='None')
+                #create the legends and add them to the plot
+                org_legend = plt.legend(org_legend_handles, [h.get_label() for h in org_legend_handles],
+                                        title="Organ", title_fontsize=34,
+                                        loc='center', prop={'size': 30}, ncol=2,
+                                        bbox_to_anchor=(0.50, 0.95),
+                                        bbox_transform=gcf().transFigure)
 
+                plt.gca().add_artist(org_legend)
 
+                type_legend = plt.legend(type_legend_handles, [h.get_label() for h in type_legend_handles],
+                                         title="Type of Feature", title_fontsize=34,
+                                         loc='center', prop={'size': 30}, ncol=2,
+                                         bbox_to_anchor=(0.74, 0.95),
+                                         bbox_transform=gcf().transFigure)
+
+                plt.gca().add_artist(type_legend)
+
+                filt_legend = plt.legend(filt_legend_handles, [h.get_label() for h in filt_legend_handles],
+                                         title="Filter", title_fontsize=34,
+                                         loc='center', prop={'size': 30}, ncol=2,
+                                         bbox_to_anchor=(0.90, 0.95),
+                                         bbox_transform=gcf().transFigure)
+
+                plt.gca().add_artist(filt_legend)
 
                 if add_col_labels:
-                    geno_legend_patch = mpatches.Patch(label='Genotype:', color='None', linestyle='None')
-                    back_legend_patch = mpatches.Patch(label='Backgound:', color='None', linestyle='None')
 
-                    all_legend_handles = [org_legend_patch] +org_legend_handles + \
-                                         [type_legend_patch] + type_legend_handles +\
-                                         [filt_legend_patch] + filt_legend_handles+\
-                                         [geno_legend_patch] +geno_legend_handles+\
-                                         [back_legend_patch] +back_legend_handles
+                    geno_legend = plt.legend(geno_legend_handles, [h.get_label() for h in geno_legend_handles],
+                                             title="Genotype", title_fontsize=34,
+                                             loc='center', prop={'size': 30},
+                                             bbox_to_anchor=(0.61, 0.82),
+                                             bbox_transform=gcf().transFigure)
 
-                    all_labels = ["Organs:"]+[h.get_label() for h in org_legend_handles]+\
-                                 ["Feature Category:"] + [h.get_label() for h in type_legend_handles]+\
-                                 ["Filter:"]+ [h.get_label() for h in filt_legend_handles]+\
-                                  ["Genotype:"]+ [h.get_label() for h in filt_legend_handles]+\
-                                  ["Background:"]+ [h.get_label() for h in filt_legend_handles]
+                    plt.gca().add_artist(geno_legend)
 
+                    back_legend = plt.legend(back_legend_handles, [h.get_label() for h in back_legend_handles],
+                                             title="Background", title_fontsize=34,
+                                             loc='center', prop={'size': 30},
+                                             bbox_to_anchor=(0.71, 0.82),
+                                             bbox_transform=gcf().transFigure)
 
-
-                else:
-                # you can only do one legend - so add them together???
-                    all_legend_handles = [org_legend_patch] + org_legend_handles + \
-                                         [type_legend_patch] + type_legend_handles + \
-                                         [filt_legend_patch] + filt_legend_handles
-
-                all_labels = ["Organ:"] + [h.get_label() for h in org_legend_handles] + \
-                             ["Feature Category:"] + [h.get_label() for h in type_legend_handles] + \
-                             ["Filter:"] + [h.get_label() for h in filt_legend_handles]
-
-                #all_labels = [h.get_label() for h in all_legend_handles]
+                    plt.gca().add_artist(back_legend)
 
 
+                    plt.tight_layout()
 
+                cbar = cg.ax_heatmap.collections[0].colorbar
+                print(cbar.ax.get_title())
 
-                #all_legend_handles = [org_legend_patch, type_legend_patch, filt_legend_patch] + all_legend_handles
-                #all_labels = ['Organ', 'Feature Category', 'Filter'] + all_labels
-
-                # Create a custom legend using the combined handles and labels
-                plt.legend(all_legend_handles, all_labels, loc='center', prop={'size': 18}, ncol=2)
-
-
-
-                plt.subplots_adjust(right=1.5, top=1)
+                cbar.set_label("Mean Ratio of Radiological Measurement", fontsize=34)
 
                 ylabels = [x.replace('_', ' ') for x in data.index]
                 reordered_ind = cg.dendrogram_row.reordered_ind
@@ -295,12 +301,14 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                 reordered_col = cg.dendrogram_col.reordered_ind
 
-                print(cg.fig)
+
                 cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
 
                 cg.ax_heatmap.set_xticks(np.arange(len(data.columns)) + 0.5)
 
-                cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col],fontsize=24, rotation=90, ha='center')
+                cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col],fontsize=40, rotation=90, ha='center')
+
+                cg.ax_cbar.tick_params(labelsize=28)
 
                 #col = cg.ax_col_dendrogram.get_position()
                 #cg.ax_col_dendrogram.set_position([col.x0, col.y0, col.width, col.height])
