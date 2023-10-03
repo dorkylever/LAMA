@@ -78,7 +78,7 @@ def test_radiomics():
             print(e)
 
             norm_meths = None
-        num_jobs = 3
+        num_jobs = 1
         logging.info(f"running with {num_jobs} jobs")
 
         # Execute the function in parallel using joblib
@@ -92,7 +92,7 @@ def test_radiomics():
         logging.info("Starting Radiomics")
 
 
-        Parallel(n_jobs=-1)(delayed(run_lama_radiomics)(i) for i in range(num_jobs))
+        Parallel(n_jobs=1)(delayed(run_lama_radiomics)(i) for i in range(num_jobs))
 
 
 def test_permutation_stats_just_ovs():
@@ -107,28 +107,28 @@ def test_permutation_stats_just_ovs():
 
 
 def test_radiomic_plotting():
-    _dir = Path("V:/ent_cohort/")
+    _dir = Path("E:/230913_gina_original_feats/features")
 
-    file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
-    file_names.sort()
+    #file_names = [spec for spec in common.get_file_paths(folder=_dir, extension_tuple=".csv")]
+    #file_names.sort()
 
-    data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
+    #data = [pd.read_csv(spec, index_col=0).dropna(axis=1) for spec in file_names]
 
     abnormal_embs = ['22300_e8','22300_e6', '50_e5']
 
-    for i, df in enumerate(data):
-        df.index.name = 'org'
-        df.name = str(file_names[i]).split(".")[0].split("/")[-1]
-        df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
-        df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i]))|('BL6' in str(file_names[i]))) else \
-            'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
+    #for i, df in enumerate(data):
+        #df.index.name = 'org'
+        #df.name = str(file_names[i]).split(".")[0].split("/")[-1]
+        #df['genotype'] = 'HET' if 'het' in str(file_names[i]) else 'WT'
+        #df['background'] = 'C57BL6N' if (('b6ku' in str(file_names[i]))|('BL6' in str(file_names[i]))) else \
+        #    'F1' if ('F1' in str(file_names[i])) else 'C3HHEH'
 
-        df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
+        #df['HPE'] = 'abnormal' if any(map(str(file_names[i]).__contains__, abnormal_embs)) else 'normal'
 
-    data = pd.concat(
-        data,
-        ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
-        names=['specimen', 'org'])
+    #data = pd.concat(
+    #    data,
+    #    ignore_index=False, keys=[os.path.splitext(os.path.basename(spec))[0] for spec in file_names],
+    #    names=['specimen', 'org'])
 
     line_file = _dir / "full_results.csv"
 
@@ -136,11 +136,13 @@ def test_radiomic_plotting():
 
     os.makedirs(org_dir, exist_ok=True)
 
+    data = pd.read_csv(line_file, index_col=0)
+
 
     #for org in data.index.get_level_values('org').unique():
     #    data[data.index.get_level_values('org') == org].to_csv(str(org_dir)+"/results_" + str(org)+ ".csv")
 
-    data.to_csv(line_file)
+    #data.to_csv(line_file)
 
     data_subset = data.select_dtypes(include=np.number)
 
@@ -149,7 +151,7 @@ def test_radiomic_plotting():
 
     embedding = pacmap.PaCMAP(n_components=2, n_neighbors=10, MN_ratio=0.5, FP_ratio=2.0, num_iters=20000, verbose=250)
 
-    data['org'] = data.index.get_level_values('org')
+    #data['org'] = data.index.get_level_values('org')
     unique_values = np.unique(data['org'])
     print(unique_values)
 
@@ -161,16 +163,19 @@ def test_radiomic_plotting():
 
 
 
-    color_class = data.index.get_level_values('org')
+    #color_class = data.index.get_level_values('org')
+
+    color_class = data['org']
 
     # fig, ax = plt.subplots(figsize=[55, 60])
     # cluster.tsneplot(score=tsne_results, show=True, theme='dark', colorlist=color_class)
 
     data['PaCMAP-2d-one'] = results[:, 0]
     data['PaCMAP-2d-two'] = results[:, 1]
-    data['org'] = data.index.get_level_values('org')
-    data['specimen'] = data.index.get_level_values('specimen')
-    data['condition'] = data['genotype'] + "_" + data['background']
+    #data['org'] = data.index.get_level_values('org')
+    #data['specimen'] = data.index.get_level_values('specimen')
+    #data['condition'] = data['genotype'] + "_" + data['background']
+    data['condition'] = data['Genotype'] + "_" + data['Treatment']
 
     corr = data.corr(method='spearman')
 
@@ -180,10 +185,10 @@ def test_radiomic_plotting():
 
 
     # Plot heatmap
-    fig, ax = plt.subplots(figsize=[56, 60])
+    fig, ax = plt.subplots(figsize=[12, 15])
 
     sns.heatmap(corr_values, ax=ax, cmap='coolwarm', annot=True, cbar=True)
-    plt.savefig("V:/ent_cohort/corr_heatmap.png")
+    plt.savefig(str(_dir/ "corr_heatmap.png"))
     plt.close()
 
 
@@ -192,7 +197,13 @@ def test_radiomic_plotting():
 
     # Create a dictionary to store the split arrays
     split_data = {}
+
     dbscan = DBSCAN(eps=0.5, min_samples=5)
+
+
+    columns = ['org', 'abnormal_embs']
+
+    result_df = pd.DataFrame(columns=columns)
 
     # Split the NumPy array based on the unique values in 'split_column'
     for value in unique_values:
@@ -208,9 +219,16 @@ def test_radiomic_plotting():
         outlier_indices = np.where(labels == -1)[0]
 
         # Access the outlier points from the coordinates
-        outlier_points = split_data.iloc[outlier_indices]['specimen']
+        #outlier_points = split_data.iloc[outlier_indices]['specimen']
 
+        outlier_points = split_data.iloc[outlier_indices].index.values
+
+        result_df = result_df.append({'org': value, 'abnormal_embs': outlier_points}, ignore_index=True)
         print(outlier_points)
+
+
+    result_df.to_csv(str(_dir/"abnormal_embs.csv"))
+
 
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -219,21 +237,38 @@ def test_radiomic_plotting():
     g = sns.lmplot(
         x="PaCMAP-2d-one", y="PaCMAP-2d-two",
         data=data,
-        #col_order=['normal', 'abnormal'],
         col='condition',
-        col_wrap=2,
+        col_order=['WT_VEH', 'HET_VEH', 'HOM_VEH','WT_TREAT', 'HET_TREAT', 'HOM_TREAT'],
+        col_wrap=3,
         hue="org",
         palette='husl',
         fit_reg=False)
-    g.set(ylim=(np.min(data['PaCMAP-2d-two'])-10, np.max(data['PaCMAP-2d-two'])+10),
-          xlim=(np.min(data['PaCMAP-2d-one'])-10, np.max(data['PaCMAP-2d-one'])+10))
+    g.set(ylim=(np.min(data['PaCMAP-2d-two'])-20, np.max(data['PaCMAP-2d-two'])+20),
+          xlim=(np.min(data['PaCMAP-2d-one'])-20, np.max(data['PaCMAP-2d-one'])+20))
 
 
-    plt.savefig("V:/ent_cohort/radiomics_2D_PaCMAP_all_cond_v2.png")
+    plt.savefig(str(_dir/"radiomics_2D_PaCMAP_all_cond_v2.png"))
+    plt.close()
+    data['specimen'] = data.index
+
+    g = sns.lmplot(
+        x="PaCMAP-2d-one", y="PaCMAP-2d-two",
+        data=data,
+        col='specimen',
+        #col_order=['WT_VEH', 'HET_VEH', 'HOM_VEH', 'WT_TREAT', 'HET_TREAT', 'HOM_TREAT'],
+        col_wrap=5,
+        hue="org",
+        palette='husl',
+        fit_reg=False)
+    g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 20, np.max(data['PaCMAP-2d-two']) + 20),
+          xlim=(np.min(data['PaCMAP-2d-one']) - 20, np.max(data['PaCMAP-2d-one']) + 20))
+
+    plt.savefig(str(_dir / "radiomics_2D_PaCMAP_all_specimen_v2.png"))
     plt.close()
 
+
     fig, ax = plt.subplots(figsize=[56, 60])
-    wt_c3h_data = data[data['condition'] == 'WT_C3HHEH']
+    wt_c3h_data = data[data['condition'] == 'WT_VEH']
 
     g = sns.lmplot(
         x="PaCMAP-2d-one", y="PaCMAP-2d-two",
@@ -247,7 +282,7 @@ def test_radiomic_plotting():
     g.set(ylim=(np.min(data['PaCMAP-2d-two']) - 10, np.max(data['PaCMAP-2d-two']) + 10),
           xlim=(np.min(data['PaCMAP-2d-one']) - 10, np.max(data['PaCMAP-2d-one']) + 10))
 
-    plt.savefig("V:/ent_cohort/radiomics_2D_PaCMAP_C3H_wt_org_v2.png")
+    plt.savefig(str(_dir /"radiomics_2D_PaCMAP_WT_VEH_org_v2.png"))
     plt.close()
 
     fig, ax = plt.subplots(figsize=[56, 60])
@@ -679,6 +714,29 @@ def test_secondary_dataset_confusion_matrix():
     plt.savefig('E:/220204_BQ_dataset/230427_extras_for_validation/test_all_scans/test_size_0.2/None/confusion_matrix.png')
 
 
+def test_clustermap():
+    inter_dataset = pd.read_csv("E:/230817_philtrum_res/perm_org_phil/two_way/inter_organ_hit_dataset_good.csv", index_col=0)
+    geno_dataset = pd.read_csv("E:/230817_philtrum_res/perm_org_phil/two_way/geno_organ_hit_dataset_good.csv", index_col=0)
+    treat_dataset = pd.read_csv("E:/230817_philtrum_res/perm_org_phil/two_way/treat_organ_hit_dataset_good.csv", index_col=0)
+
+    outdir = Path("E:/230817_philtrum_res/perm_org_phil/two_way/")
+
+    results_dict = {}
+
+    input_dict = {"inter": inter_dataset, "geno": geno_dataset, "treat": treat_dataset}
+
+    for key, dset in input_dict.items():
+
+        dset.clip(upper=2, lower=0, inplace=True)
+        #df = dset.transpose()
+
+        if not clustermap(dset, title="Hooly", use_sns=True, rad_plot=False):
+            logging.info(f'Skipping heatmap for {key} as there are no results')
+
+        plt.tight_layout()
+
+        plt.savefig(outdir / f"{key}__organ_hit_clustermap.png")
+        plt.close()
 
 
 
@@ -904,7 +962,7 @@ def test_radiomic_org_plotting():
 
 
 def test_get_rad_data_for_perm():
-    _dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/radiomics_output")
+    _dir = Path("E:/230817_rad_feats/")
 
     wt_dir = Path("Z:/jcsmr/ArkellLab/Lab Members/Kyle/PhD/220428_Hard_drive/221122_two_way/g_by_back_data/baseline")
 
