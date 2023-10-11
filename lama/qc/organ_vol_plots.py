@@ -13,7 +13,7 @@ Added scatter plots
 from pathlib import Path
 import math
 from typing import List
-
+from PIL import Image
 import numpy as np
 import seaborn as sns
 from matplotlib.figure import Figure
@@ -26,6 +26,7 @@ from lama.common import getfile_startswith_endswith
 from lama.qc import formatting
 from lama.paths import specimen_iterator
 from tqdm import tqdm
+from scipy import stats
 
 ORGAN_VOL_LABEL = 'organ volume'  # Y label
 WEV_LABEL = 'whole embryo volume'  # x label for scatter plots
@@ -209,8 +210,8 @@ def make_plots(organ_vols: pd.DataFrame,
         numcol = 6 if len(hits) > 5 else len(hits)
         numrows = math.ceil(len(hits) / numcol)
 
-        figsize_y = 7 * numrows
-        figsize_x = 7 * numcol
+        figsize_y = 14 * numrows
+        figsize_x = 14 * numcol
 
         fig = Figure(figsize=(figsize_x, figsize_y))
         FigureCanvas(fig)
@@ -269,17 +270,54 @@ def make_plots(organ_vols: pd.DataFrame,
                     scatter_df.rename(columns={'line': 'condition'}, inplace=True)
                     sax = sns.scatterplot(y=label, x=WEV_LABEL, ax=s_axes, hue='condition',
                                           data=scatter_df)
+
                 else:
                     scatter_df.rename(columns={label: label_name, 'line': 'condition'}, inplace=True)
                     sax = sns.scatterplot(y=label_name, x=WEV_LABEL, ax=s_axes, hue='condition',
                                       data=scatter_df)
 
+                # so this will add regplot for each condition
+
+                # So this is for adding the the regplot and outlier labels
+                # the group is called 'condition' in the two_way data
+                group_to_split = 'condition'
+                # first four colours defined by sns scatterplot
+                colour_list = ["blue", "orange", "green", "red"]
+
+
             else:
                 scatter_df = organ_vols.loc[(organ_vols.line == 'baseline') | (organ_vols.line == mut_line)]
                 scatter_df = scatter_df[[label, WEV_LABEL, 'line']]
                 scatter_df.rename(columns={label: label_name, 'line': 'genotype'}, inplace=True)
-                sax = sns.scatterplot(y=label_name, x=WEV_LABEL, ax=s_axes, hue='genotype',
+                sax = sns.scatterplot(y=label_name, x=WEV_LABEL, ax=s_axes, hue='genotype', kind="reg",
                                       data=scatter_df)
+
+                group_to_split = 'genotype'
+                colour_list = ["blue", "orange"]
+
+
+
+            # So this for loop is based off code by Gina Brichacek - resid_plot.py
+            #I just had to modify the code for the data passed to make_plots
+            for group, colour in zip(scatter_df[group_to_split].unique(), colour_list): #iterates for each group
+                # splits the dataset
+                group_data = scatter_df[scatter_df[group_to_split] == group]
+                # creates a line of best fit and allows the axes to be passed to the regplot
+                sns.regplot(data=group_data, y=label_name, x=WEV_LABEL, ax=s_axes, scatter=False, color=colour)
+                # idenitifies outliers from the dataset
+                z = np.abs(stats.zscore(group_data[label_name] / group_data[WEV_LABEL]))
+                # had to modify this so it gets the specimen name of the outlier
+                outliers = group_data.iloc[np.where(z > 2)[0],].index
+
+                for index, row in group_data.iterrows():
+
+                    if index in outliers:
+                        # ID is just the index for the df
+                        s_axes.text(row[WEV_LABEL] + .02, row[label_name], index, style='oblique',
+                                    bbox={'facecolor': colour, 'alpha': 0.2, 'pad': 2})
+
+
+
 
             sax.set(xlabel='Whole embryo volume (mm^3)')
             sax.set(ylabel='Organ volume (mm^3)')
@@ -314,3 +352,21 @@ def make_plots(organ_vols: pd.DataFrame,
         else:
             scatter_name = f'{mut_line}_scatter_plots.png'
         fig_scat.savefig(stats_line_dir / scatter_name)
+
+        #Also from Gina - converting png to html.
+        plot_file_name = str(stats_line_dir / scatter_name)
+
+        image = Image.open(plot_file_name)
+        #new = image.resize((1200, 1800))
+        #I don't know why we're resaving the file - ask Gina about this
+        #new.save(plot_file_name)
+        html_filename = f'{mut_line}_output.html'
+        html_file = open(str(stats_line_dir/html_filename), 'a')
+        html_file.write("<html>\n")
+        html_file.write(f'<img src="{plot_file_name}" alt="cfg">\n')
+        html_file.write("</html>\n")
+        html_file.close()
+        print(str(stats_line_dir/html_filename))
+        plt.clf()
+        plt.close()
+

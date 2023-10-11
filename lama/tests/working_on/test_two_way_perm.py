@@ -267,13 +267,13 @@ def test_add_significance():
     add_two_way_significance(df, 0.05)
 
 
-@pytest.mark.skip
+
 def test_two_way_plotting():
-    data = pd.read_csv('E:/Bl6_data/211014_g_by_back/permutation_stats/perm_output/input_data.csv', index_col=0)
+    data = pd.read_csv('E:/221122_two_way/permutation_stats/perm_output/input_data.csv', index_col=0)
 
-    label_info = Path('E:/Bl6_data/211014_g_by_back/target/E14_5_atlas_v24_43_label_info.csv')
+    label_info = Path('E:/221122_two_way/target/E14_5_atlas_v24_43_label_info.csv')
 
-    lines_root_dir = Path('E:/Bl6_data/211014_g_by_back/permutation_stats/perm_output')
+    lines_root_dir = Path('E:/221122_two_way/permutation_stats/perm_output')
 
     normalise_to_whole_embryo = True
     voxel_size = 40
@@ -288,15 +288,13 @@ def test_two_way_plotting():
 
     make_plots(data_for_plots, label_info, lines_root_dir, voxel_size=voxel_size, two_way=True, skip_no_analysis=True)
 
-
-@pytest.mark.skip
 def test_dist_plots():
     line_null = pd.read_csv(
-        "E:/Bl6_data/211014_g_by_back/permutation_stats/perm_output/distributions/null_line_dist_pvalues.csv")
+        "E:/221122_two_way/permutation_stats/perm_output/distributions/null_line_dist_pvalues.csv")
     line_alt = pd.read_csv(
-        "E:/Bl6_data/211014_g_by_back/permutation_stats/perm_output/distributions/alt_line_dist_pvalues.csv")
+        "E:/221122_two_way/permutation_stats/perm_output/distributions/alt_line_dist_pvalues.csv")
     line_organ_thresholds = pd.read_csv(
-        "E:/Bl6_data/211014_g_by_back/permutation_stats/perm_output/distributions/line_organ_p_thresholds.csv")
+        "E:/221122_two_way/permutation_stats/perm_output/distributions/line_organ_p_thresholds.csv")
     dist_plot_root = out_dir / 'distribution_plots'
     line_plot_dir = dist_plot_root / 'line_level'
     line_plot_dir.mkdir(parents=True, exist_ok=True)
