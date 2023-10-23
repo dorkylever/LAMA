@@ -688,7 +688,6 @@ def test_find_shared_feats():
     geno_dataset = pd.read_csv("V:/230905_head_text_stuff/two_way/geno_organ_hit_dataset.csv", index_col=0)
     treat_dataset = pd.read_csv("V:/230905_head_text_stuff/two_way/treat_organ_hit_dataset.csv", index_col=0)
 
-    print(inter_dataset)
     outdir = Path("V:/230905_head_text_stuff/two_way/")
 
     results_dict = {}
@@ -706,10 +705,14 @@ def test_find_shared_feats():
 
             df.clip(upper=2, lower=0, inplace=True)
             df = df.transpose()
+
             if not clustermap(df, title="Hooly", use_sns=True, rad_plot=True):
                 logging.info(f'Skipping heatmap for {num_rows} as there are no results')
 
+            df.to_csv(outdir / f"{key}_rows{num_rows}_organ_hit.csv")
+
             plt.tight_layout()
+
 
             plt.savefig(outdir / f"{key}_rows{num_rows}_organ_hit_clustermap.png")
             plt.close()
@@ -717,16 +720,17 @@ def test_find_shared_feats():
 
 
     inters = results_dict.get("inter")
-
-
-
+    # ,
+    #                      '210926_b6ku_22299_e1_het','210926_b6ku_22296_e7_het'
+    abnormal_embs = ['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het']
+    # '210926_b6ku_22299_e1_het','210926_b6ku_22296_e7_het',
     genos = results_dict.get("geno")
-    genos = genos.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
+    genos = genos.drop(abnormal_embs, axis=0)
 
 
     treats = results_dict.get("treat")
 
-    treats = treats.drop(['220422_BL6_Ku_50_e5_het', '210913_b6ku_22300_e6_het','210913_b6ku_22300_e8_het'], axis=0)
+    treats = treats.drop(abnormal_embs, axis=0)
 
 
 
@@ -740,16 +744,59 @@ def test_find_shared_feats():
         treats.index).any(), "Some index values are duplicated between 'genos' and 'treats' DataFrames."
 
     # Step 1: Find shared columns
-    shared_columns = set(genos.columns).intersection(treats.columns).intersection(inters.columns)
 
+
+    shared_columns_int_treat = set(inters.columns).intersection(treats.columns)
+
+    #treats = treats[shared_columns_int_treat]
+    #treats = treats.loc[:, ~treats.columns.duplicated()]
+    #inters = inters[shared_columns_int_treat]
+    #inters = inters.loc[:, ~inters.columns.duplicated()]
+
+    #assert inters.columns.isin(
+    #   treats.columns).any(), "Some columns values are duplicated between 'inters' and 'treats' DataFrames."
+
+
+    #inter_treat = pd.concat([inters, treats], axis=0)
+    #inter_treat.fillna(1, inplace=True)
+
+    #inter_treat.clip(upper=2, lower=0, inplace=True)
+    #inter_treat = inter_treat.transpose()
+    #inter_treat.to_csv(str(outdir / "inter_treat.csv"))
+
+    #if not clustermap(inter_treat, title="Hooly", use_sns=True, rad_plot=True, add_col_labels=True):
+    #    logging.info('Skipping heatmap for as there are no results')
+
+    #plt.tight_layout()
+    #plt.savefig(outdir / "inter_treat_organ_hit_clustermap_good.png")
+    #plt.close()
+
+    shared_columns = set(inters.columns).intersection(treats.columns).intersection(genos.columns)
+
+    #shared_columns = set(set(inters.columns).intersection(treats.columns).union(set(inters.columns).intersection(genos.columns)))
+
+    shared_columns_v2 = set(genos.columns).union(treats.columns).intersection(genos.columns)
+
+    genos = genos.loc[:, ~genos.columns.duplicated()]
     genos = genos[shared_columns]
-    treats = treats[shared_columns]
-    unique_feats_HPE = inters.loc[:, ~inters.columns.isin(shared_columns)].transpose()
 
+    treats = treats.loc[:, ~treats.columns.duplicated()]
+    treats = treats[shared_columns]
+
+    unique_feats_HPE = inters.loc[:, ~inters.columns.isin(shared_columns_v2)].transpose()
+
+    inters = inters.loc[:, ~inters.columns.duplicated()]
     inters = inters[shared_columns]
 
-    # Step 2: Perform row-wise merge
+
     full_dataset = pd.concat([inters, genos, treats], axis=0)
+
+    print(shared_columns_v2)
+
+
+
+    # Step 2: Perform row-wise merge
+
 
     full_dataset.to_csv(str(outdir/"full_datasets_heatmap.csv"))
 
@@ -763,6 +810,7 @@ def test_find_shared_feats():
     if not clustermap(unique_feats_HPE, title="Hooly", use_sns=True, rad_plot=True):
         logging.info('Skipping heatmap for as there are no results')
 
+    unique_feats_HPE.to_csv(str(outdir / "unique_feats_heatmap.csv"))
     plt.tight_layout()
     plt.savefig(outdir / "Unique_to_inter_organ_hit_clustermap_good.png")
     plt.close()
@@ -929,9 +977,9 @@ def test_permutation_stats():
 
 
 def test_two_way_pene_plots():
-    _dir = Path("V:/230905_head_text_stuff/")
+    _dir = Path("V:/230612_perm_stats/permutation_stats/perm_output/")
     _label_dir = Path("V:/230612_target/target/E14_5_atlas_v24_43_label_info_v5.csv")
-    heatmaps_for_permutation_stats(root_dir=_dir, two_way=True, label_info_file=_label_dir, rad_plot=True)
+    heatmaps_for_permutation_stats(root_dir=_dir, two_way=True, label_info_file=_label_dir, rad_plot=False)
 
 
 def test_sns_clustermap():

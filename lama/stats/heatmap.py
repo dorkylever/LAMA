@@ -19,7 +19,7 @@ def heatmap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False):
     fig, ax = plt.subplots(figsize=[56, 60])
     # use_sns = False
 
-    font_size = 14 if rad_plot else 22
+    font_size = 12
 
     if use_sns:
         # sns.palplot(sns.color_palette("coolwarm"))
@@ -76,7 +76,7 @@ def get_additional_info(idx, si, ei=None):
 def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False, z_norm: bool=False, Z=None, add_col_labels=None):
 
     print("add_col", add_col_labels)
-    font_size = 5 if Z is not None else 16 if rad_plot else 22
+    font_size = 5 if Z is not None else 16 if rad_plot else 12
     sys.setrecursionlimit(10000)
     # use_sns = False
     if use_sns:
@@ -86,7 +86,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
             return
         try:
             #figheight = len(data)*0.05 if Z is not None else len(data)*0.3
-            figheight=60
+            figheight=45
             figheight = figheight if figheight * 100 < 65536 else 655
             if rad_plot:
                 #l = 0.5, s = 0.8
@@ -94,18 +94,24 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 # feature names
                 feature_info = pd.read_csv("V:/230612_target/target/feature_info_unfilt.csv")
 
+
                 # get all organ names and create a consistent colour code
                 org_list = feature_info.org_name.dropna().to_list()
                 org_lut = dict(zip(org_list, sns.husl_palette(len(org_list))))
 
+
                 # extract the organ name for each row in the dataset and map the corresponding colour
                 org_name = data.index.to_series().apply(get_additional_info, si=3).to_list()
 
+
                 org_row_colors = pd.DataFrame(org_name)[0].map(org_lut)
+
+                pd.DataFrame(org_name).to_csv("V:/230905_head_text_stuff/two_way/org_row_names.csv")
+
+                org_row_colors.to_csv("V:/230905_head_text_stuff/two_way/org_row_cols.csv")
 
                 # For the legend - only get the names exists (i.e. are statistically significant)
                 org_lut_real = {key: value for key, value in org_lut.items() if key in org_name}
-
 
                 # same thing but for filters and types
                 filter_name = data.index.to_series().apply(get_additional_info, si=0, ei=1).to_list()
@@ -125,6 +131,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 type_lut_real = {key: value for key, value in type_lut.items() if key in type_name}
                 type_row_colors = pd.DataFrame(type_name)[0].map(type_lut)
 
+
                 # Now lets tidy up the rows:
 
                 metadata = pd.read_csv("V:/230612_target/target/staging_info_volume.csv", index_col=0)
@@ -132,11 +139,12 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 merged_data = data.transpose().merge(metadata, left_index=True, right_on='vol')
 
                 if add_col_labels:
-                    print("yo dude")
+
                     genos = merged_data["Genotype"]
 
                     #genos = [row for row in genos if row.index in data.columns]
                     genos_lut = dict(zip(set(genos), sns.color_palette(palette='Set1', n_colors=len(set(genos)))))
+
 
                     geno_row_colors = genos.map(genos_lut).loc[data.columns].dropna()
 
@@ -220,9 +228,10 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                             center=1,
                                             cbar_kws={'label': 'mean ratio of radiological measurement', "shrink": 0.5},
                                             square=True, yticklabels=False,
+                                            #, type_row_colors, filt_row_colors
                                             row_colors=[org_row_colors, type_row_colors, filt_row_colors],
                                             # col_colors=[geno_row_colors, back_row_colors],
-                                            figsize=[45, figheight])
+                                            figsize=[60, figheight])
 
                 # create an entry in the figure legend for organ, type and filter
                 # create the legend handles (i.e. the keys for the legends)
@@ -238,24 +247,24 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 #create the legends and add them to the plot
                 org_legend = plt.legend(org_legend_handles, [h.get_label() for h in org_legend_handles],
                                         title="Organ", title_fontsize=34,
-                                        loc='center', prop={'size': 30}, ncol=2,
-                                        bbox_to_anchor=(0.50, 0.95),
+                                        loc='center', prop={'size': 30}, ncol=4,
+                                        bbox_to_anchor=(0.46, 0.83),
                                         bbox_transform=gcf().transFigure)
 
                 plt.gca().add_artist(org_legend)
 
                 type_legend = plt.legend(type_legend_handles, [h.get_label() for h in type_legend_handles],
                                          title="Type of Feature", title_fontsize=34,
-                                         loc='center', prop={'size': 30}, ncol=2,
-                                         bbox_to_anchor=(0.74, 0.95),
+                                         loc='center', prop={'size': 30}, ncol=3,
+                                         bbox_to_anchor=(0.68, 0.83),
                                          bbox_transform=gcf().transFigure)
 
                 plt.gca().add_artist(type_legend)
 
                 filt_legend = plt.legend(filt_legend_handles, [h.get_label() for h in filt_legend_handles],
                                          title="Filter", title_fontsize=34,
-                                         loc='center', prop={'size': 30}, ncol=2,
-                                         bbox_to_anchor=(0.90, 0.95),
+                                         loc='center', prop={'size': 30}, ncol=5,
+                                         bbox_to_anchor=(0.83, 0.83),
                                          bbox_transform=gcf().transFigure)
 
                 plt.gca().add_artist(filt_legend)
@@ -265,7 +274,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                     geno_legend = plt.legend(geno_legend_handles, [h.get_label() for h in geno_legend_handles],
                                              title="Genotype", title_fontsize=34,
                                              loc='center', prop={'size': 30},
-                                             bbox_to_anchor=(0.61, 0.82),
+                                             bbox_to_anchor=(0.23, 0.83),
                                              bbox_transform=gcf().transFigure)
 
                     plt.gca().add_artist(geno_legend)
@@ -273,7 +282,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                     back_legend = plt.legend(back_legend_handles, [h.get_label() for h in back_legend_handles],
                                              title="Background", title_fontsize=34,
                                              loc='center', prop={'size': 30},
-                                             bbox_to_anchor=(0.71, 0.82),
+                                             bbox_to_anchor=(0.28, 0.83),
                                              bbox_transform=gcf().transFigure)
 
                     plt.gca().add_artist(back_legend)
@@ -292,6 +301,8 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                 # Fix up embryo IDs and add column colours
 
                 merged_data = data.transpose().merge(metadata, left_index=True, right_on='vol')
+
+
                 merged_data.set_index('Embryo_ID', inplace=True)
                 merged_data = merged_data.transpose()
 
@@ -306,7 +317,9 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
                 cg.ax_heatmap.set_xticks(np.arange(len(data.columns)) + 0.5)
 
-                cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col],fontsize=40, rotation=90, ha='center')
+                cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col],fontsize=12, rotation=90, ha='center')
+
+                print([merged_data.columns[i] for i in reordered_col])
 
                 cg.ax_cbar.tick_params(labelsize=28)
 
@@ -320,6 +333,7 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
 
 
             elif z_norm:
+
                 cg = sns.clustermap(data,
                                     z_score=0,
                                     metric="euclidean",
@@ -329,6 +343,8 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                     square=True)
 
             else:
+                metadata = pd.read_csv("V:/230612_target/target/staging_info_volume.csv", index_col=0)
+
                 cg = sns.clustermap(data,
                                     metric="euclidean",
                                     cmap=sns.diverging_palette(250, 15, l=70, s=400, sep=40, n=512, center="light",
@@ -336,6 +352,33 @@ def clustermap(data: pd.DataFrame, title, use_sns=False, rad_plot: bool = False,
                                     center=1,
                                     cbar_kws={'label': 'mean volume ratio'},
                                     square=True)
+
+                merged_data = data.transpose()
+                merged_data.index = [name[:-1] for name in merged_data.index]
+                print(merged_data)
+                merged_data = merged_data.merge(metadata, left_index=True, right_on='vol')
+
+                merged_data.merge(metadata, left_index=True, right_on='vol')
+
+
+
+                print(merged_data)
+                merged_data.set_index('Embryo_ID', inplace=True)
+                merged_data = merged_data.transpose()
+
+                print(merged_data)
+
+                # xlabels = [x.replace('_', ' ') for x in merged_data.columns]
+
+                reordered_col = cg.dendrogram_col.reordered_ind
+
+                cg.ax_heatmap.tick_params(axis='y', labelsize=font_size)
+
+                cg.ax_heatmap.set_xticks(np.arange(len(data.columns)) + 0.5)
+
+                cg.ax_heatmap.set_xticklabels([merged_data.columns[i] for i in reordered_col], fontsize=12, rotation=90,
+                                              ha='center')
+
 
 
         except ValueError as e:

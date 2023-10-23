@@ -21,7 +21,7 @@ def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFra
     # transpose so specimens are rows
     target_dataset = target_dataset.transpose()
     test_dataset = test_dataset.transpose()
-
+    # '22299_e1','22296_e7'
     abnormal_embs = ['22300_e8','22300_e6', '50_e5']
 
     # add abnormal embryos tags:
@@ -45,6 +45,7 @@ def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFra
 
     filtered_data = {}
     max_rows = target_dataset.shape[0]
+    ncols_filtered ={}
 
     for num_rows in range(max_rows, 1, -1):
         row_counts = target_dataset.apply(lambda x: x.ne(1).sum(), axis=0)
@@ -56,8 +57,23 @@ def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFra
         filtered_columns = [col for col in filtered_columns if col in test_dataset.columns]
 
         filtered_data[num_rows] = test_dataset[filtered_columns]
+        ncols_filtered[num_rows] = test_dataset[filtered_columns].shape[1]
 
     results = {}
+
+    for num_rows in range(max_rows, 1, -1):
+        row_counts = target_dataset.apply(lambda x: (x==1).sum(), axis=0)
+        num_boring = target_dataset.apply(lambda x: (pd.to_numeric(x, errors='coerce') == 1).sum(), axis=0)
+        filtered_columns = target_dataset.columns[
+            (row_counts == max_rows) & (num_boring >= num_rows) ]
+        filtered_columns = [col for col in filtered_columns if col in test_dataset.columns]
+
+        # get number of colums from the positive row
+
+        filtered_data[-num_rows] = test_dataset[filtered_columns].sample(n=ncols_filtered[num_rows], axis='columns')
+
+
+
 
     for num_rows, df in filtered_data.items():
         #feats_of_int = df.columns[(df != 1).any()]
