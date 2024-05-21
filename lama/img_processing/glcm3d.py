@@ -7,118 +7,84 @@ Implement a 3D GLCM for use in the registration  pipeline
 
 import numpy as np
 import SimpleITK as sitk
+import os
 from logzero import logger as logging
+import argparse
+
 try:
-    from radiomics import firstorder, getTestCase, glcm, glrlm, glszm, imageoperations, shape
+    from radiomics import firstorder, getTestCase, glcm, glrlm, glszm, imageoperations, shape, gldm
 except ImportError:
     logging.warn('pyradiomics not installed. No glcms will be made')
     pyrad_installed = False
 else:
     pyrad_installed = True
-from os.path import join, basename, splitext, dirname, realpath
-import common
+
+from lama import common
 import yaml
+from pathlib import Path
 
 MAXINTENSITY = 255
 # GLCM constants
 CHUNK_SIZE = 10
 GLCM_BINS = 8
 
-SCRIPT_DIR = dirname(realpath(__file__))
-PATH_TO_ITK_GLCM = join(SCRIPT_DIR, '../dev/texture/GLCMItk/LamaITKTexture')
+
+# SCRIPT_DIR = dirname(realpath(__file__))
+# PATH_TO_ITK_GLCM = join(SCRIPT_DIR, '../dev/texture/GLCMItk/LamaITKTexture')
 
 
-def _reshape_data(shape, chunk_size, result_data):
-    """
-    The data from the GLCM analysis is subsampled and so smaller than the original data. To be able to overlay
-    onto real image data, we need to upsample the result
-
-    Parameters
-    ----------
-
-    Returns
-    -------
-    A numpy ndarray? Should be 1D
-    """
-    out_array = np.zeros(shape)
-    i = 0
-    # We go x-y-z as thats how it comes out of the GLCM generator
-    for x in range(0, shape[2] - chunk_size, chunk_size):
-        for y in range(0, shape[1] - chunk_size, chunk_size):
-            for z in range(0, shape[0] - chunk_size, chunk_size):
-                out_array[z: z + chunk_size, y: y + chunk_size, x: x + chunk_size] = result_data[i]
-                i += 1
-
-    return out_array
-
-
-def pyradiomics_glcm(vol_dir, out_dir, mask, chunksize=CHUNK_SIZE, feature='Contrast'):
+def pyradiomics_glcm(vol_dir, out_dir, mask_dir, feature='Contrast'):
     """
     Create glcm and xtract features. Spit out features per chunk as a 1D numpy array
     This 1d array can be reassembled into a 3D volume using common.rebuid_subsamlped_output
 
     Parameters
     ----------
-    vol_dir: str
-        Directory containing volumes. Can be be in sub folders
-    output_dir: str
-        Where to put the output. Folder must exist
-    mask: numpy.ndarray
-        mask used to exclude the masked regions from analysis
-    chunksize: int
-        the size of the chunck to make each glcm from
-    feature: str
-        what feature type to report
+
 
     """
     if not pyrad_installed:
         return
 
     settings = {'binWidth': 4,
-            'interpolator': sitk.sitkBSpline,
-            'resampledPixelSpacing': None}
+                'interpolator': sitk.sitkBSpline,
+                'resampledPixelSpacing': None}
 
     vol_paths = common.get_file_paths(vol_dir)
 
-    glcm_mask = np.ones([chunksize] * 3)  # No glcm mask. Set all to 1s. Needed for pyradiomics
-    glcm_mask_img = sitk.GetImageFromArray(glcm_mask)
+    mask_paths = common.get_file_paths(mask_dir)
 
-    for path in vol_paths:
-        array = common.img_path_to_array(path)
-        result = []
+    out_dir = Path(out_dir)
 
-        for chunk in common.get_chunks(array, chunksize, mask):
+    # glcm_mask = np.ones([chunksize] * 3)  # No glcm mask. Set all to 1s. Needed for pyradiomics
+    # glcm_mask_img = sitk.GetImageFromArray(glcm_mask)
 
-            chunk_img = sitk.GetImageFromArray(chunk)  # I need to make a sitk chunker
-            glcmFeatures = glcm.RadiomicsGLCM(chunk_img, glcm_mask_img, **settings)
-            glcmFeatures.enableAllFeatures()
-            glcmFeatures.calculateFeatures()
-            result.append(glcmFeatures.featureValues[feature])
+    for i, path in enumerate(vol_paths):
+        vol = common.LoadImage(path).img
+        mask = common.LoadImage(mask_paths[i]).img
 
-        # Write the 1D array result. Only where chunks where mask does not all == 0.
-        out_array = np.array(result)
-        out_path = join(out_dir, splitext(basename(path))[0] + '.npy')
-        np.save(out_path, out_array)
+        gldm_matrix = gldm.RadiomicsGLDM(inputImage=vol, mask=mask).P_gldm
 
-        out_config = {
-            'original_shape': list(array.shape),
-            'chunksize': chunksize}
+        gldm_test = sitk.GetImageFromArray(gldm_matrix)
 
-        out_config_path = join(out_dir, 'glcm.yaml')
-        with open(out_config_path, 'w') as fh:
-            fh.write(yaml.dump(out_config))
+        gldm_file_name = out_dir / os.path.basename(path)
+
+        sitk.WriteImage(gldm_test, gldm_file_name, useCompression=True)
+
+        # result = []
+        #
 
 
 if __name__ == '__main__':
-    import sys
-    input_ = sys.argv[1]
-    out_dir = sys.argv[2]
-    mask_path = sys.argv[3]
-    mask_array = common.img_path_to_array(mask_path)
+    parser = argparse.ArgumentParser("Create textures")
+    parser.add_argument('-i', '--input_folder', dest='target_dir', help='Raw NRRD directory', required=True,
+                        type=str)
+    parser.add_argument('-m', '--mask_folder', dest='mask_dir', help='Raw NRRD directory', required=True,
+                        type=str)
 
-    pyradiomics_glcm(input_, out_dir, mask_array, feature='Contrast')
+    parser.add_argument('-o', '--output', dest='out_dir', help='directory of LAMA target (i.e. pop avg)',
+                        required=True,
+                        type=str)
+    args = parser.parse_args()
 
-
-
-
-
+    pyradiomics_glcm(args.target_dir, args.out_dir, args.mask_dir)

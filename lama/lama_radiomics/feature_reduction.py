@@ -1,6 +1,6 @@
 from logzero import logger as logging
 import os
-from catboost import CatBoostClassifier, Pool, sum_models, cv, CatBoostRegressor
+from catboost import CatBoostClassifier, Pool, sum_models, cv, CatBoostRegressor, EShapCalcType, EFeaturesSelectionAlgorithm
 import matplotlib.pyplot as plt
 # import time
 import shap
@@ -27,9 +27,9 @@ from collections import Counter
 
 from sklearn.model_selection import KFold
 
+from sklearn.feature_selection import mutual_info_classif
 
-
-
+from BorutaShap import BorutaShap
 def non_tum_normalise(tum_dataset: pd.DataFrame, non_tum_dataset: pd.DataFrame):
     #do an assertion between tumour and non_tumour sizes and IDs
 
@@ -90,8 +90,14 @@ def correlation(dataset: pd.DataFrame, _dir: Path = None, threshold: float = 0.9
     for i in range(len(corr_matrix.columns)):
         for j in range(i):
             if abs(corr_matrix.iloc[i, j]) > threshold:  # we are interested in absolute coeff value
-                colname = corr_matrix.columns[i]  # getting the name of column
-                col_corr.add(colname)
+                colname_i = corr_matrix.columns[i]  # getting the name of columns and j
+                colname_j = corr_matrix.columns[j]
+
+                mi_i = mutual_info_classif(dataset[[colname_i]], dataset.index).mean()
+                mi_j = mutual_info_classif(dataset[[colname_j]], dataset.index).mean()
+
+                #figure out which is more predictive of the target (i.e.,)
+                col_corr.add(colname_j) if mi_i > mi_j else col_corr.add(colname_i)
     return col_corr
 
 
@@ -226,7 +232,6 @@ def smote_oversampling(X, k: int = 6, max_non_targets: int = 300):
 
 
 
-
 def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.DataFrame = None, test_size: float = 0.2, non_tum_path: str = None):
     logging.info("Doing org: {}".format(org))
 
@@ -317,10 +322,7 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
     logging.info("doing feature selection using SHAP")
 
     shap_values = m.get_feature_importance(Pool(X, X.index.to_numpy()), type='ShapValues', )[:, :-1]
-    print(np.shape(shap_values))
-    print(shap_values)
     shap_importance = shap_feature_ranking(X, shap_values)
-
 
     if org:
         n_feats = []
@@ -349,6 +351,33 @@ def run_feat_red(X, org, rad_file_path, batch_test=None, complete_dataset: pd.Da
         plt.savefig(str(org_dir / str(n)) + "/shap_feat_rank_plot.png")
 
         plt.close()
+
+    # test BorutaSHAP
+    x_train, x_test, y_train, y_test = train_test_split(X, X.index.to_numpy(), test_size=test_size)
+
+    train_data = Pool(data=x_train, label=y_train)
+
+    eval_data = Pool(data=x_test, label=y_test)
+
+    #boruta_shap = BorutaShap(model=m, importance_measure='shap', classification=True)
+    #boruta_shap.fit(X=x_train, y=y_train, n_trials=100, random_state=42)
+
+    fig, ax = plt.subplots(figsize=[50, 50])
+    m_for_sel_feats = m
+    summary = m_for_sel_feats.select_features(train_data, y_train, eval_set=eval_data, algorithm=EFeaturesSelectionAlgorithm.RecursiveByShapValues,
+                      shap_calc_type=EShapCalcType.Exact, train_final_model=True, steps=1000, logging_level='Verbose', plot=False)
+
+    plt.tight_layout()
+    plt.xticks(fontsize=12)
+    plt.yticks(fontsize=12)
+
+    plt.savefig(str(org_dir/"feature_selection_plot.png")
+    plt.close()
+
+    # Get the selected features
+    #selected_features = boruta_shap.TentativeRoughFix()
+
+
 
 
 
