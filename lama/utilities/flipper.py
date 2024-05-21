@@ -4,7 +4,7 @@ from pathlib import Path
 from lama import common
 
 def main(target_dir: Path = os.getcwd()):
-    target_dir = Path("V:/230713_more_imgs/contours")
+    target_dir = Path(os.getcwd())
     volpaths = common.get_file_paths(target_dir)
     print('flipping')
 
