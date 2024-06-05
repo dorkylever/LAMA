@@ -1,0 +1,745 @@
+---
+title: "rad_clustering"
+author: "Kyle"
+date: "2024-01-19"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+.libPaths("/g/data/nm24/Overt_pheno_rlibs")
+
+library(ConsensusClusterPlus)
+library(dplyr)
+library(readr)
+library(tidyverse)
+library(janitor)
+library(viridisLite)
+#library(ggpmisc)
+library(ggplot2)
+library(readr)
+library(stringr)
+library(ggforce)
+knitr::opts_chunk$set(echo = TRUE)
+
+n_fun_pos <- function(x){
+  return(data.frame(y = max(x), label = paste0(length(x))))
+}
+
+n_fun_neg <- function(x){
+  return(data.frame(y = min(x), label = paste0(length(x))))
+}
+```
+
+## R Markdown
+
+# Wild-type C3H/HeH all-features
+
+```{r cars}
+rad_info <- read_csv("radiomics_data.csv")
+
+label_info <- read_csv("E14_5_atlas_v24_43_label_info_v5.csv")
+
+
+staging_info <- read_csv("220914_full_staging.csv")
+
+
+rad_info <- merge(rad_info, staging_info[c(1,2,3,4)], by.x = 'vol', by.y = 'vol', all.x = T)
+
+normalise_2 <- function(x, na.rm = FALSE) (x/rad_info$WEV)
+
+
+rad_info <- rad_info %>% remove_constant() 
+#%>% mutate(across(where(is.numeric) & !matches('WEV'), normalise_2))
+```
+
+## Including Plots
+
+You can also embed plots, for example:
+
+```{r pressure, echo=FALSE}
+rad_info <- arrange(transform(rad_info, Background=ordered(Background,levels=c("C3H","C57BL6"))))
+
+rad_info <- arrange(transform(rad_info, Genotype=ordered(Genotype,levels=c("WT","HET"))))
+
+all_info <- rad_info
+
+rad_info <- rad_info %>% filter(Genotype=="WT", Background == "C3H")
+
+numbers <- unique(sub(".*__", "", names(rad_info)[-1]))
+
+# Create a list to store the split datasets
+split_datasets <- list()
+
+# Loop through each number and subset the columns based on the number
+for (num in numbers) {
+  cols <- grep(paste0("__", num, "$"), names(rad_info))
+  split_datasets[[num]] <- rad_info[, c(1, cols)]
+}
+
+```
+
+```{r}
+
+rad_info_matrix <- data.frame(cbind(split_datasets$`1`, split_datasets$`3`, split_datasets$`17`, split_datasets$`18`)) %>% select_if(is.numeric) %>% na.omit() %>% as.matrix()
+
+#
+# Calculate the correlation matrix using Pearson coefficient
+cor_matrix <- cor(rad_info_matrix, method = "pearson")
+
+# Convert correlation to distance
+dist_matrix <- as.dist(1 - cor_matrix)
+
+```
+Note that the `echo = FALSE` parameter was added to the code chunk to prevent printing of the R code that generated the plot.
+```{r}
+
+consensus_obj <- ConsensusClusterPlus(
+  dist_matrix,
+  distance = "pearson",
+  maxK = 10,  # Maximum number of clusters to consider
+  reps = 50,  # Number of resampling iterations - turn up if needed
+  pItem = 0.8,  # Proportion of items to sample on each iteration
+  pFeature = 1,  # Proportion of features to sample on each iteration
+  clusterAlg = "hc",
+  finalLinkage = "ward.D",# Use Ward's algorithm
+  innerLinkage = "ward.D",# Use Ward's algorithm
+  verbose= T,
+  plot = TRUE  # Plot the consensus clustering results
+)
+
+```
+```{r}
+classes <- consensus_obj[[7]]$consensusClass
+# Use filter on the extracted data frame or tibble
+filtered_classes <- sort(classes[classes==1])
+
+
+paste(length(filtered_classes), " of ", length(classes), " features (", round((length(filtered_classes)/length(classes))*100,2), "%)", sep="")
+
+```
+
+```{r }
+plot_list <- list()
+
+
+complete_df <- data.frame(matrix(ncol=4, nrow=0))
+colnames(complete_df) <- c("Filter", "Type", "Stat", "Org")
+# Iterate over filtered_classes from 1 to 7
+for (i in 1:7) {
+  # Filter the classes
+  filtered_classes <- sort(classes[classes == i])
+  
+  # Print the information about the filtered classes
+  message(paste(length(filtered_classes), " of ", length(classes), " features (", round((length(filtered_classes) / length(classes)) * 100, 2), "%)", sep = ""))
+  
+  # Split the names
+  split_names <- strsplit(names(filtered_classes), "_")
+  split_names <- sapply(split_names, function(x) if (length(x) == 6) x[c(-1, -5)] else x[-4])
+  
+  # Create the cluster_df
+  cluster_df <- data.frame(t(split_names))
+  
+  colnames(cluster_df) <- c("Filter", "Type", "Stat", "Org")
+  complete_df <- rbind(complete_df, cluster_df)
+  
+  # Count and proportion of occurrences for the "Org" column
+  org_counts <- table(cluster_df$Org)
+  org_proportions <- prop.table(org_counts)
+  
+  # Count and proportion of interactions
+  interaction_counts <- table(cluster_df$Filter, cluster_df$Type, cluster_df$Org)
+  interaction_proportions <- prop.table(interaction_counts)
+  
+  # Convert interaction_proportions to a data frame
+  interaction_df <- as.data.frame.table(interaction_proportions)
+  colnames(interaction_df) <- c("Filter", "Type", "Org", "Proportion")
+  
+  # Create the plot for this iteration and store it in the list
+  plot_list[[i]] <- ggplot(interaction_df, aes(x = Filter, y = Proportion, fill = Type)) +
+    geom_bar(stat = "identity", position = "stack") +
+    labs(title = paste("Proportions by Filter and Type (Cluster =", i, ")", sep = " "), x = "Filter", y = "Proportion", fill = "Type") +
+    facet_wrap(~Org, scales = "fixed", nrow = 1) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+}
+
+# Print the plots
+for (i in 1:7) {
+  print(plot_list[[i]])
+}
+
+```
+# all feats - non clustered
+```{r, fig.width=10}
+  
+# Count and proportion of interactions
+interaction_counts <- table(complete_df$Filter, complete_df$Type, complete_df$Org)
+interaction_proportions <- prop.table(interaction_counts)
+  
+# Convert interaction_proportions to a data frame
+interaction_df <- as.data.frame.table(interaction_proportions)
+colnames(interaction_df) <- c("Filter", "Type", "Org", "Proportion")
+  
+# Create the plot for this iteration and store it in the list
+ggplot(interaction_df, aes(x = Filter, y = Proportion, fill = Type)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = paste("Proportions by Filter and Type (all_clusters)", sep = " "), x = "Filter", y = "Proportion", fill = "Type") +
+  facet_wrap(~Org, scales = "fixed", nrow = 1) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+```
+
+##Significant feats only
+
+```{r }
+#setting up dataset
+significant_feats <- read_csv("full_datasets_heatmap.csv")
+
+#rownames(significant_feats) <- significant_feats$radiomic_name
+
+# Remove the first column from the data frame
+#significant_feats <- significant_feats[, -1]
+
+
+
+#significant_feats <-t(significant_feats) %>% remove_constant()
+
+colnames(significant_feats) <- str_replace_all(colnames(significant_feats), " ", "_") 
+
+
+colnames(significant_feats) <- gsub("[0-9.]", "", colnames(significant_feats)) 
+
+significant_feats <- significant_feats %>% dplyr::select(unique(names(.)))
+
+background <- significant_feats %>% filter(str_detect(vol, "wt")) %>% select_if(is.numeric)
+
+C3Hs <- significant_feats %>% filter(str_detect(vol, "C3H")) %>% select_if(is.numeric)
+
+cols_outside_range <- names(which(colMeans(background) < 0.95 | colMeans(background) > 1.05))
+
+cols_outside_range2 <- names(which(colMeans(C3Hs) < 0.95 |colMeans(C3Hs) > 1.05))
+
+HPE_bros <- c("210913_b6ku_22300_e6_het",
+"210913_b6ku_22300_e8_het",
+"210926_b6ku_22296_e7_het",
+"210926_b6ku_22299_e1_het",
+"220422_BL6_Ku_50_e5_het")
+
+
+sev_HPE_bros <- c("210913_b6ku_22300_e6_het",
+"210913_b6ku_22300_e8_het",
+"220422_BL6_Ku_50_e5_het")
+
+four_bros <- c("210913_b6ku_22300_e6_het",
+"210913_b6ku_22300_e8_het",
+"210926_b6ku_22299_e1_het",
+"220422_BL6_Ku_50_e5_het")
+
+HPE_feats <- significant_feats %>%
+  filter(vol %in% sev_HPE_bros) %>% select_if(is.numeric)
+
+
+
+
+bad_HPE_feats <- names(which(apply(HPE_feats, 2, function(x) any(x == 1))))
+
+good_HPE_feats <- names(which(apply(HPE_feats, 2, function(x) all(x != 1))))
+
+
+all_feats <- significant_feats
+
+significant_feats <- significant_feats[,!(colnames(significant_feats) %in% c(cols_outside_range, cols_outside_range2, bad_HPE_feats))]
+
+
+
+write.csv(significant_feats, "significant_feats_exact.csv")
+```
+
+```{r}
+
+rad_info_colnames <- colnames(rad_info)
+
+mapping <- data.frame(label = label_info$label, label_name = label_info$label_name)
+
+
+numbers <- as.numeric(gsub(".*__([0-9]+)$", "\\1", rad_info_colnames))
+
+
+match_indices <- match(numbers, as.integer(mapping$label))
+
+
+for (i in 1:length(rad_info_colnames)) {
+  if (!is.na(match_indices[i])) {
+    rad_info_colnames[i] <- gsub("__[0-9]+$", paste0(" ", mapping$label_name[match_indices[i]]), rad_info_colnames[i])
+  }
+}
+
+rad_info_colnames <- str_replace(rad_info_colnames, " ", "_")
+
+colnames(rad_info) <- rad_info_colnames
+
+
+
+
+filtered_dataset <- rad_info[, colnames(rad_info) %in% colnames(significant_feats)]
+
+
+weird_dataset <- significant_feats[, !(colnames(significant_feats) %in% colnames(rad_info))]
+
+filtered_dataset$vol <- rad_info$vol
+
+
+filtered_dataset <- merge(filtered_dataset, staging_info)
+
+filtered_dataset
+
+```
+
+
+```{r}
+filtered_matrix_s <- filtered_dataset %>% select_if(is.numeric) %>% dplyr::select(-WEV) %>% remove_constant() %>% as.matrix()
+
+cor_matrix_sf_s <- cor(filtered_matrix_s, method = "pearson")
+
+# Convert correlation to distance
+dist_matrix_sf_s <- as.dist(1 - cor_matrix_sf_s)
+
+consensus_obj_v3 <- ConsensusClusterPlus(
+  dist_matrix_sf_s,
+  distance = "pearson",
+  maxK = 10,  # Maximum number of clusters to consider
+  reps = 50,  # Number of resampling iterations
+  pItem = 0.8,  # Proportion of items to sample on each iteration
+  pFeature = 1,  # Proportion of features to sample on each iteration
+  clusterAlg = "hc",
+  finalLinkage = "ward.D",# Use Ward's algorithm
+  innerLinkage = "ward.D",# Use Ward's algorithm
+  verbose= F,
+  plot = TRUE  # Plot the consensus clustering results
+)
+```
+
+```{r}
+classes <- consensus_obj_v3[[7]]$consensusClass
+# Use filter on the extracted data frame or tibble
+filtered_classes <- sort(classes[classes==1])
+
+
+paste(length(filtered_classes), " of ", length(classes), " features (", round((length(filtered_classes)/length(classes))*100,2), "%)", sep="")
+
+```
+
+```{r fig.width=10, fig.height=6}
+# Define a function to merge elements after the third element
+merge_after_third <- function(vec) {
+  vec[4] <- paste(vec[4:length(vec)], collapse = " ")
+  vec <- vec[1:4]
+  return(vec)
+}
+
+plot_list <- list()
+complete_df <- data.frame(matrix(ncol=4, nrow=0))
+colnames(complete_df) <- c("Filter", "Type", "Stat", "Org")
+# Iterate over filtered_classes from 1 to 7
+for (i in 1:7) {
+  # Filter the classes
+  filtered_classes <- sort(classes[classes == i])
+  
+  # Print the information about the filtered classes
+  message(paste(length(filtered_classes), " of ", length(classes), " features (", round((length(filtered_classes) / length(classes)) * 100, 2), "%)", sep = ""))
+  
+  # Split the names
+  split_names <- strsplit(names(filtered_classes), "_")
+  split_names <- lapply(split_names, function(x) {
+    if ("wavelet" %in% x) {x <- x[c(-1)]}
+    return(x)})
+  
+  
+  split_names <- lapply(split_names, merge_after_third)
+  
+  # Create the cluster_df
+  cluster_df <- data.frame(matrix(unlist(split_names), nrow=length(split_names), byrow=TRUE))
+  colnames(cluster_df) <- c("Filter", "Type", "Stat", "Org")
+  complete_df <- rbind(complete_df, cluster_df)
+  
+  # Count and proportion of occurrences for the "Org" column
+  org_counts <- table(complete_df$Org)
+  org_proportions <- prop.table(org_counts)
+  
+  # Count and proportion of interactions
+  interaction_counts <- table(cluster_df$Filter, cluster_df$Type, cluster_df$Org)
+  interaction_proportions <- prop.table(interaction_counts)
+  
+  # Convert interaction_proportions to a data frame
+  interaction_df <- as.data.frame.table(interaction_proportions)
+  colnames(interaction_df) <- c("Filter", "Type", "Org", "Proportion")
+  
+  # Create the plot for this iteration and store it in the list
+  plot_list[[i]] <- ggplot(interaction_df, aes(x = Filter, y = Proportion, fill = Type)) +
+    geom_bar(stat = "identity", position = "stack") +
+    labs(title = paste("Proportions by Filter and Type (Cluster =", i, ")", sep = " "), x = "Filter", y = "Proportion", fill = "Type") +
+    facet_wrap(~Org, scales = "fixed", nrow = 2) +
+    theme_minimal() +
+    theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+}
+
+# Print the plots
+for (i in 1:7) {
+  print(plot_list[[i]])
+}
+
+```
+
+
+```{r, fig.width=12, fig.height=8}
+  
+# Count and proportion of interactions
+interaction_counts <- table(complete_df$Filter, complete_df$Type, complete_df$Stat, complete_df$Org)
+interaction_proportions <- prop.table(interaction_counts)
+  
+# Convert interaction_proportions to a data frame
+interaction_df <- as.data.frame.table(interaction_counts)
+colnames(interaction_df) <- c("Filter", "Type", "Stat", "Org", "Proportion")
+
+  
+# Create the plot for this iteration and store it in the list
+ggplot(interaction_df, aes(x = Type, y = Proportion, fill = Filter)) +
+  geom_bar(stat = "identity", position = "stack") +
+  labs(title = paste("Features Significant in both mild and severe HPE embryos", sep = " "), x = "Statistic", y = "Frequency", fill = "Type") +
+  facet_wrap(~Org, scales = "fixed", nrow = 2) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+```
+
+
+```{r}
+
+all_feats_use <- all_feats %>% filter(vol %in% sev_HPE_bros)%>% select_if(is.numeric)
+
+all_feats_use <- all_feats_use[,!(colnames(all_feats_use) %in% c(cols_outside_range, cols_outside_range2))]
+
+all_means_vol <-all_feats_use %>% colMeans()
+
+
+split_names <- strsplit(names(all_feats_use), "_")
+
+split_names <- lapply(split_names, function(x) {
+    if ("wavelet" %in% x) {x <- x[c(-1)]}
+    return(x)})
+
+split_names <- lapply(split_names, merge_after_third)
+  
+  # Create the cluster_df
+all_df <- data.frame(matrix(unlist(split_names), nrow=length(split_names), byrow=TRUE))
+
+colnames(all_df) <- c("Filter", "Type", "Stat", "Org")
+
+all_df$VolMean <- all_means_vol
+
+
+pos_or_neg <- "Not Significant"
+
+all_df$Correlation <- pos_or_neg
+
+all_df
+
+#all_df <- all_df %>% filter(Org=="forebrain anteroventral region")
+
+```
+
+
+```{r, fig.width=8, fig.height=6}
+# get mean_vol_ratio across HPE bryos
+
+significant_feats_means <- significant_feats %>% filter(vol %in% sev_HPE_bros) %>% select_if(is.numeric) %>% colMeans()
+  
+
+split_names <- strsplit(names(significant_feats_means), "_")
+
+split_names <- lapply(split_names, function(x) {
+    if ("wavelet" %in% x) {x <- x[c(-1)]}
+    return(x)})
+
+split_names <- lapply(split_names, merge_after_third)
+  
+  # Create the cluster_df
+cluster_df <- data.frame(matrix(unlist(split_names), nrow=length(split_names), byrow=TRUE))
+colnames(cluster_df) <- c("Filter", "Type", "Stat", "Org")
+  
+
+cluster_df$VolMean <- significant_feats_means
+pos_or_neg <- ifelse(significant_feats_means < 1, "Negative", "Positive")
+
+
+
+
+cluster_df$Correlation <- pos_or_neg
+  
+# Create the plot for this iteration and store it in the list
+
+org_type_levels <- c("glrlm.brain lateral ventricle","firstorder.forebrain anteroventral region", "glcm.forebrain anteroventral region","gldm.forebrain anteroventral region","glrlm.forebrain anteroventral region","glszm.forebrain anteroventral region", "ngtdm.forebrain anteroventral region",    "shape.forebrain anteroventral region","gldm.midbrain","glrlm.midbrain", "ngtdm.midbrain", "firstorder.vomeronasal cavity")
+
+cluster_df$Org_Type <- factor(interaction(cluster_df$Type, cluster_df$Org), levels=org_type_levels)
+
+split_by_corr <- split(cluster_df, cluster_df$Correlation)
+
+my_palette <- hcl.colors(7, palette = "Dark3")
+
+type_colors <- setNames(my_palette, c("firstorder","glcm","gldm","glrlm","glszm","ngtdm", "shape"))
+
+
+
+
+ggplot(mapping=aes(x = Type, y = log2(VolMean), col=Correlation)) +
+  #geom_point(data=all_df, width = 0.5, position = position_dodge(width = 0.75), alpha=0.5)+
+  geom_boxplot(data = split_by_corr$Negative, width = 0.5, position = position_dodge(width = 0.75)) +
+  #geom_point(data = split_by_corr$Negative, width = 0.5, position = position_dodge(width = 0.75))+
+  geom_boxplot(data = split_by_corr$Positive, width = 0.5, position = position_dodge(width = 0.75)) +
+  #geom_point(data = split_by_corr$Positive, width = 0.5, position = position_dodge(width = 0.75)) +
+  labs(title = "Statistically Significant Features in Mild and Severe HPE embryos", x = "Feature Type", 
+       y = expression("Log"[2] * "(Mean Measurement Ratio Between HPE and Non-HPE embryos)"), color = "Association of Feature") +
+  theme_minimal()+
+  facet_wrap(~Org, scales = "fixed", nrow = 1)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1), legend.position = "bottom") +
+  #scale_y_continuous(breaks = c(0, 1, 2, 3, 4, 5, 6, 7, 8)) +
+  #facet_zoom(ylim = c(0, 2), zoom.data = ifelse((VolMean <= 2), NA, FALSE)) +
+  #cale_color_manual(values = c("blue", "red"))+
+  scale_y_continuous(limits=c(-2,2))+
+  scale_color_manual(values = c("blue", "red"))+
+  #geom_segment(aes(x = "Org1_TypeB", xend = "Org2_TypeA", y = -Inf, yend = Inf), linetype = "dashed") 
+  #scale_color_manual(values = type_colors)
+  #facet_zoom(ylim = c(0, 2), zoom.data = ifelse((VolMean <= 2)&(Org == 'forebrain anteroventral region'), NA, FALSE))+
+  stat_summary(data = split_by_corr$Negative, fun.data = n_fun_neg, geom = "text", col="blue", vjust = 2)+
+  stat_summary(data = split_by_corr$Positive, fun.data = n_fun_pos, geom = "text", col="red", vjust = -1)
+  
+  
+  #expand_limits(y = c(0, 8.5)) 
+
+
+
+```
+
+
+
+```{r}
+
+test_all_info <- all_info %>% dplyr::select(where(is.numeric))
+
+split_names <- strsplit(names(test_all_info), "_")
+
+
+split_names <- lapply(split_names, function(x) {
+    if ("wavelet" %in% x) {x <- x[c(-1)]}
+    return(x)})
+
+
+split_names <- lapply(split_names, merge_after_third)
+
+all_info_df <- data.frame(matrix(unlist(split_names), nrow=length(split_names), byrow=TRUE))
+colnames(all_info_df) <- c("Filter", "Type", "Stat", "Org")
+
+
+all_info_df$Org <- mapping$label_name[match(as.numeric(all_info_df$Org), mapping$label)]
+
+
+
+all_info_df <- na.omit(all_info_df)
+
+
+all_info_df$Org <- gsub("_", " ", all_info_df$Org)
+
+
+complete_df_counts <- table(complete_df$Filter, complete_df$Type, complete_df$Org, useNA = "ifany") %>% as.data.frame()
+
+
+
+interaction_counts_all <- table(all_info_df$Filter, all_info_df$Type, all_info_df$Org)
+
+interaction_counts_test <- table(all_info_df$Filter, all_info_df$Org)
+
+interaction_counts_all <- data.frame(interaction_counts_all)
+
+colnames(interaction_counts_all) <- c("Filter", "Type", "Org", "Total")
+
+colnames(complete_df_counts) <- c("Filter", "Type", "Org", "Freq")
+
+
+counts_table <- merge(interaction_counts_all, complete_df_counts, all.x=T, all.y=T, by=c("Filter", "Type","Org"))
+
+counts_table[is.na(counts_table)] <- 0
+
+
+# correct for size factors:
+
+# get total cell counts and divide by global mean
+#totals <- colSums(select_if(interaction_counts, is.numeric)) 
+
+#size_factors <- interaction_counts_all$Freq / mean(interaction_counts_all$Freq)
+
+#cont_table_xtabs <- xtabs(Frequency ~ Cell_Type + Genotype, data = cell_counts_long_v2)
+
+# just replaces the data with the normalised data
+#dataset[2:9] <- dataset[2:9]/size_factors[col(dataset[2:9])]
+counts_table
+all_info_df
+
+```
+
+
+```{r}
+library(multcomp)
+counts_table <- counts_table %>% mutate(Prop=Freq/Total)
+
+counts_table <- counts_table[complete.cases(counts_table), ]
+
+#kruskal.test(Prop ~ Org, data = counts_table)
+
+test <- counts_table %>% filter(Org=='forebrain anteroventral region')
+
+model <-aov(Prop ~ Filter*Type, data = test)
+
+anova(model)
+
+# Perform the post-hoc test
+#posthoc <- glht(model, linfct = mcp(`Type:Filter` = "Tukey"))
+
+# Get compact letter display
+#cld(posthoc)
+test <- test %>% mutate(Non_Sign_Freq = Total-Freq)
+
+
+# Loop over each type and perform Fisher's exact test
+sign_table <- xtabs(Freq ~ Type, data = test)
+
+non_sign_table <- xtabs(Non_Sign_Freq ~ Type, data = test)
+
+contingency_table <- rbind(sign_table, non_sign_table)
+
+contingency_table
+
+
+proportions <- xtabs(Prop ~ Filter + Type, data = test)
+
+
+
+results <- apply(proportions, 2, function(col) {
+  binom.test(sum(col > 0), length(col), p=0.05, alternative="greater")
+})
+
+results
+
+p_values <- sapply(results, function(x) x$p.value)
+p_values
+
+fisher_result <- fisher.test(contingency_table)
+
+
+fisher_result
+
+p_values <- sapply(fisher_results, function(x) x$p.value)
+p_values
+```
+
+
+
+```{r, fig.height=10, fig.width=14}
+
+library(Rmisc)
+
+# compute mean and standard error of the mean by subgroup
+summary_stat <- summarySE(counts_table,
+  measurevar = "Prop",
+  groupvars = c("Type", "Org")
+)
+
+# plot mean and standard error of the mean
+ggplot(
+  subset(summary_stat, !is.na(Type)), # remove NA level for Type
+  aes(x = Org, y = Prop, colour = Type, fill=Type)
+) +
+  geom_errorbar(aes(ymin = Prop - se, ymax = Prop + se), # add error bars
+    width = 0.1 # width of error bars
+  ) +
+  geom_col() +
+  labs(y = "Proportion of Features")+
+  facet_wrap(~Type, ncol = 2)+
+  theme(axis.text.x = element_text(angle = 90, vjust = 0.5, hjust = 1))
+
+
+
+```
+
+
+```{r}
+
+model2 <-aov(Prop ~ Filter*Type, data = counts_table)
+
+summary(model2)
+
+#test <- TukeyHSD(model2, which = "Filter:Type")
+
+# only type is significant
+# Perform the post-hoc test
+
+model3 <- aov(Prop ~ Type, data = counts_table)
+posthoc
+posthoc <- glht(model3, linfct = mcp(Type="Tukey"))
+
+# Get compact letter display
+cld(posthoc)
+
+
+```
+
+
+
+```{r fig.width=30}
+
+model4 <- aov(Prop ~ Org*Type, data = counts_table)
+
+summary(model4)
+
+test <- TukeyHSD(model4, which = "Org:Type")
+
+#library(effects)
+
+#plot(allEffects(test))
+
+
+library(Rmisc)
+
+# compute mean and standard error of the mean by subgroup
+summary_stat <- summarySE(counts_table,
+  measurevar = "Prop",
+  groupvars = c("Org", "Type")
+)
+
+# plot mean and standard error of the mean
+ggplot(
+  subset(summary_stat, !is.na(Type)), # remove NA level for Type
+  aes(x = Org, y = Prop, colour = Type)
+) +
+  geom_errorbar(aes(ymin = Prop - se, ymax = Prop + se), # add error bars
+    width = 0.1 # width of error bars
+  ) +
+  geom_point() +
+  labs(y = "Mean of body mass (g)")
+
+
+
+with(
+  counts_table,
+  interaction.plot(Org, Type, Prop)
+)
+
+library(multcompView)
+
+
+# Assuming test is your Tukey's HSD test object
+cld_results <- multcompLetters(test)
+
+# Print the compact letter display
+print(cld_results)
+```
