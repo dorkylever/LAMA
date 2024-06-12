@@ -33,6 +33,7 @@ allowed_cfg_keys = [
     'two_way',
     'rad_dir',
     'spec_fdr',
+    'line_fdr',
     'check_files'
 ]
 
@@ -95,6 +96,8 @@ def run(cfg_path):
 
     spec_fdr = float(cfg.get('spec_fdr', 0.2))
 
+    line_fdr = float(cfg.get('line_fdr', 0.05))
+
     rad_dir = p(cfg.get('rad_dir'))
     run_permutation_stats.run(wt_dir=wt_dir,
                               mut_dir=mut_dir,
@@ -102,6 +105,7 @@ def run(cfg_path):
                               num_perms=n_perm,
                               label_info=label_meta,
                               specimen_fdr=spec_fdr,
+                              line_fdr=line_fdr,
                               label_map_path=label_map,
                               normalise_to_whole_embryo=wev_norm, qc_file=qc_file,
                               voxel_size=voxel_size,
