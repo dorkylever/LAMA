@@ -140,7 +140,7 @@ def get_thresholds(null_dist: pd.DataFrame, alt_dist: pd.DataFrame, target_thres
                     pthresh_fdrs.append((p_to_test, fdr_at_thresh))
 
             # create a dataframe of p-value thresholds and associated fdrs
-            p_fdr_df = pd.dataframe.from_records(pthresh_fdrs, columns=['p', 'fdr'])
+            p_fdr_df = pd.DataFrame.from_records(pthresh_fdrs, columns=['p', 'fdr'])
 
             if len(p_fdr_df) > 0:
                 p_under_target_fdr = p_fdr_df[p_fdr_df.fdr <= target_threshold]
