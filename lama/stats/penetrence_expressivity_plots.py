@@ -84,7 +84,7 @@ def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFra
     return results
 
 
-def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_info_file: Path = None, rad_plot: bool = False):
+def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_info_file: Path = None, rad_plot: bool = False, good_labels = None):
     """
     This function works on the output of the premutation stats. For the non-permutation, may need to make a different
     function to deal with different directory layout
