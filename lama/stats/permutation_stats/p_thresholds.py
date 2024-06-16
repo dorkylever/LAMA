@@ -146,11 +146,11 @@ def get_thresholds(null_dist: pd.DataFrame, alt_dist: pd.DataFrame, target_thres
                 p_under_target_fdr = p_fdr_df[p_fdr_df.fdr <= target_threshold]
 
                 if len(p_under_target_fdr) < 1:
-                    lowest_fdr_row = p_fdr_df.loc[p_fdr_df['fdr'].idxmin()]
+                    lowest_fdr_row = p_fdr_df.loc[p_fdr_df['fdr'].astype(float).idxmin()]
                     p_thresh = lowest_fdr_row['p']
                     best_fdr = lowest_fdr_row['fdr']
                 else:
-                    row = p_fdr_df.loc[p_under_target_fdr.p.idxmax()]
+                    row = p_fdr_df.loc[p_under_target_fdr.p.astype(float).idxmax()]
                     p_thresh = row['p']
                     best_fdr = row['fdr']
 
