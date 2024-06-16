@@ -429,8 +429,7 @@ def annotate(thresholds: pd.DataFrame,
                     df.loc[label, 'cohens_d'] = cohens_d(num_ovs, dem_ovs)
 
             else:
-                mut_ovs = label_organ_vol[label_organ_vol.line == line][label_col]
-
+                mut_ovs = label_organ_vol[label_organ_vol.line == line][label_col] if is_line_level else label_organ_vol.loc[label_organ_vol.index == row.index[0], label_col]
                 df.loc[label, 'mean_vol_ratio'] = mut_ovs.mean() / wt_ovs.mean()
                 if is_line_level:
                     cd = cohens_d(mut_ovs, wt_ovs)
@@ -508,7 +507,7 @@ def add_label_names(df: pd.DataFrame, label_info: Path) -> pd.DataFrame:
     """
     label_df = pd.read_csv(label_info, index_col=0)
     #if its radiomics data, the columns will have __
-    if df.index[0].__contains__("__"):# this is for radiomics data
+    if not df.empty and df.index[0].__contains__("__"): #for radiomics data
         # any integer value stuffs up the re  - so for simplicity we can replace the substrings
         # dictionary of replacements
         label_nums = [int(re.findall('\d+', _row)[-1]) for _row in df.index]
@@ -532,6 +531,7 @@ def add_significance(df: pd.DataFrame, threshold: float):
     and the fdr is lower than fdr threshold.
     And sort values by significance
     """
+    df[GENOTYPE_P_COL_NAME] = df[GENOTYPE_P_COL_NAME].apply(lambda x: float(x[0]) if isinstance(x, np.ndarray) else x)
     df[PERM_SIGNIFICANT_COL_NAME] = (df[GENOTYPE_P_COL_NAME] <= df['p_thresh']) & (df['fdr'] <= threshold)
 
     df.sort_values(by=[PERM_SIGNIFICANT_COL_NAME, GENOTYPE_P_COL_NAME], ascending=[False, True], inplace=True)
