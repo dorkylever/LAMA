@@ -45,7 +45,7 @@ setup(
         'pytest',
         'tqdm',
         'gitpython',
-        'pacmap',
+        'pacmap==0.7.0',
         'shap',
         'joblib',
         'wheel',
