@@ -192,7 +192,6 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
             records.append([n, n_combs_to_try, max_combs])
         df = pd.DataFrame.from_records(records, columns=['n', 'num_combs', 'max_combs'], index='n').sort_index(
             ascending=True)
-        print(df)
 
         # test whether it's possible to have this number of permutations with data structure
         # so for the two-way this wont change
