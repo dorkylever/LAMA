@@ -14,9 +14,6 @@ import fastcluster
 from scipy.spatial.distance import pdist
 
 
-
-
-
 def filt_for_shared_feats(target_dataset: pd.DataFrame, test_dataset: pd.DataFrame):
     # transpose so specimens are rows
     target_dataset = target_dataset.transpose()
@@ -95,8 +92,6 @@ def heatmaps_for_permutation_stats(root_dir: Path, two_way: bool = False, label_
         skip_analysis = True if 'no_analysis' in label_info.columns else False
         if skip_analysis:
             good_labels = label_info[label_info['no_analysis'] != True].label_name
-    else:
-        good_labels = None
 
     if two_way: # read data.csv  to get the conditions
         data_path = root_dir / "radiomics_data.csv" if rad_plot else root_dir / "input_data.csv"
@@ -291,7 +286,6 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             heat_df.fillna(1, inplace=True)
 
 
-
             heat_df.to_csv(str(outdir / f"{line}_organ_hit_dataset.csv"))
 
             # so in the radiomics stuff  - you get really large values, somehow they're negative!!
@@ -313,14 +307,14 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             plt.close()
 
 
-            #logging.info("Creating Additional z-normalised plots")
-            #if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True,Z=Z):
-            #    logging.info(f'Skipping heatmap for {line} as there are no results')
+            logging.info("Creating Additional z-normalised plots")
+            if not clustermap(heat_df, title=title, use_sns=True, rad_plot=rad_plot, z_norm=True,Z=Z):
+                logging.info(f'Skipping heatmap for {line} as there are no results')
 
-            #plt.tight_layout()
+            plt.tight_layout()
 
-            #plt.savefig(outdir / f"{line}_organ_hit_clustermap_z_normed.png")
-            #plt.close()
+            plt.savefig(outdir / f"{line}_organ_hit_clustermap_z_normed.png")
+            plt.close()
 
             logging.info("creating heatmaps per organ")
 
@@ -358,6 +352,23 @@ def line_specimen_hit_heatmap(line_hits_csv: Path,
             #plt.tight_layout()
 
             plt.savefig(outdir / f"{line}_organ_hit_heatmap.png")
+            plt.close()
+            
+            heat_df.dropna(how='all', inplace=True)
+            heat_df.fillna(1, inplace=True)
+
+            heat_df.to_csv(str(outdir / f"{line}_organ_hit_dataset.csv"))
+
+            # so in the radiomics stuff  - you get really large values, somehow they're negative!!
+            # TODO: figure that the hell out why I'm getting negative values
+            heat_df.clip(upper=2, lower=0, inplace=True)
+
+            if not clustermap(heat_df, title=title, use_sns=True):
+                logging.info(f'Skipping heatmap for {line} as there are no results')
+
+            plt.tight_layout()
+
+            plt.savefig(outdir / f"{line}_organ_hit_clustermap.png")
             plt.close()
     except ValueError as e:
         print(e)
