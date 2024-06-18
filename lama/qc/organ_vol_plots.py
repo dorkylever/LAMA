@@ -68,10 +68,10 @@ def pvalue_dist_plots(null: pd.DataFrame, alt: pd.DataFrame, thresholds: pd.Data
 
     # you need to perform log different depending on the input
     alt = alt.applymap(lambda x: np.log(x.astype(float))) if two_way else alt.applymap(
-        lambda x: float(x)) if main_of_two_way else np.log(alt)
+        lambda x: float(x))
 
     null = null.applymap(lambda x: np.log(x.astype(float))) if two_way else null.applymap(
-        lambda x: float(x)) if main_of_two_way else np.log(null)
+        lambda x: float(x))
 
     for col in alt:
         try:
@@ -91,7 +91,7 @@ def pvalue_dist_plots(null: pd.DataFrame, alt: pd.DataFrame, thresholds: pd.Data
                 hist(alt[col])
                 hist(null[col])
                 plt.xlabel(x_label)
-                plt.legend(labels=['p threshold = {}'.format(format(thresh, '.3g')), 'alt', 'null'])
+                plt.legend(labels=['p threshold = {}'.format(format(float(thresh), '.3g')), 'alt', 'null'])
                 plt.axvline(log_thresh, 0, 1, alpha=0.4, color='g')
 
             plt.xlabel(x_label)
