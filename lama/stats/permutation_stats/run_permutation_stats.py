@@ -336,6 +336,7 @@ def annotate(thresholds: pd.DataFrame,
                 df.rename(columns={0: GENOTYPE_P_COL_NAME}, inplace=True)
 
         else:
+            spec_name = df.columns
             df.rename(columns={id_: GENOTYPE_P_COL_NAME}, inplace=True)
 
         if is_line_level:
