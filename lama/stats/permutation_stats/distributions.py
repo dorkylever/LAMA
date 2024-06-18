@@ -518,7 +518,7 @@ def null_line(wt_indx_combinations: dict,
         # will trigger for radiomics data
     elif two_way:
         # Run each label on a thread
-        pdists = Parallel(n_jobs=-1)(delayed(_two_way_null_line_thread)
+        pdists = Parallel(n_jobs=16)(delayed(_two_way_null_line_thread)
                                      (prepare(i), num_perms, wt_indx_combinations, i) for i in tqdm(cols))
     else:
         pdists = Parallel(n_jobs=-1)(delayed(_null_line_thread)
