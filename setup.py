@@ -30,7 +30,7 @@ setup(
         'statsmodels>=0.9.0',
         'PyYAML>=3.13',
         'catboost==1.1.0',
-        'SimpleITK>=2.1.0',
+        'SimpleITK==2.1.0',
         'pyradiomics>=3.0.1',
         'threadpoolctl==3.1.0',
         'imbalanced-learn==0.9.0',
