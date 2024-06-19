@@ -55,7 +55,6 @@ setup(
         'cuda-python==11.8.1',
         'typing_extensions>=4.0.0',
         'fastcluster',
-        'mpi4py',
     ],
     extras_require={
         'dev': ['h5py'],
