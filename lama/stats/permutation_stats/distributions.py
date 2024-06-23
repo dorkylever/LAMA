@@ -162,6 +162,13 @@ def generate_random_two_way_combinations(data: pd.DataFrame, num_perms):
     data = data.drop(columns='staging', errors='ignore')
     line_specimen_counts = get_line_specimen_counts(data, two_way=True)
 
+    cols_to_drop = line_specimen_counts.columns[line_specimen_counts.loc['baseline'] == 0]
+
+    logging.warning(f'the following measurements have no baselines: {cols_to_drop}')
+
+    # Drop these columns from the DataFrame
+    line_specimen_counts.drop(columns=cols_to_drop, inplace=True)
+
     n_groups = get_two_way_n_groups(data)
 
     result = {}
