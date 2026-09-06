@@ -53,7 +53,6 @@ setup(
         'torch',
         'numexpr',
         'bottleneck',
-        'cuda-python==11.8.1',
         'typing_extensions>=4.0.0',
         'fastcluster',
     ],
