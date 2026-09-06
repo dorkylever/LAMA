@@ -42,6 +42,7 @@ setup(
         'pytest',
         'tqdm',
         'gitpython',
+        'borutashap',
         'pacmap==0.7.0',
         'shap',
         'joblib',
