@@ -31,7 +31,6 @@ setup(
         'PyYAML>=3.13',
         'catboost>=1.2.0',
         'SimpleITK>=2.3.0',
-        'pyradiomics>=3.0.1',
         'imbalanced-learn>=0.11.0',
         'raster-geometry',
         'filelock',
